@@ -1,0 +1,22 @@
+# Netskope AI Gateway — deployment role
+# ── Copy to terraform.tfvars and fill in your values ─────────────────────────
+# Run this once before deploying any AIG template. Requires an existing AWS
+# identity with permission to create IAM roles and policies.
+
+aws_region = "us-east-1"
+
+role_name = "aig-deployment-role"
+
+# IAM principals that may assume this role to run terraform apply.
+# Accepts IAM user ARNs, role ARNs, or the account root.
+trusted_principal_arns = [
+  "arn:aws:iam::123456789012:user/your-iam-user",
+  # "arn:aws:iam::123456789012:role/your-ci-role",
+]
+
+# ── Prefix coupling ───────────────────────────────────────────────────────────
+# Change these only if you change appliance_name or secret_name in the
+# deployment template away from their defaults.
+
+resource_prefix = "aig-"   # must match the appliance_name prefix
+secret_prefix   = "aig/"   # must match the secret_name path prefix

@@ -1,0 +1,5 @@
+boto3>=1.34
+requests>=2.31
+pytest>=7.4
+pytest-timeout>=2.2
+pytest-json-report>=1.5

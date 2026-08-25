@@ -1,0 +1,36 @@
+# Netskope AI Gateway — existing VPC deployment
+# ── Copy to terraform.tfvars and fill in your values ─────────────────────────
+#
+# Netskope credentials (set as environment variables, not in this file):
+#   export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
+#   export NETSKOPE_API_KEY="your-rest-api-v2-token"
+
+# ── AWS ───────────────────────────────────────────────────────────────────────
+
+aws_region = "us-west-1"
+
+# ── Existing VPC ──────────────────────────────────────────────────────────────
+
+vpc_id    = "vpc-0123456789abcdef0"
+subnet_id = "subnet-0123456789abcdef0"
+
+# CIDRs allowed to reach the AI Gateway on port 443.
+allowed_cidr_blocks = ["10.0.0.0/8"]
+
+# ── EC2 ───────────────────────────────────────────────────────────────────────
+
+# Default AMI is us-east-1. Update for other regions (obtain from Netskope).
+aig_ami_id    = "ami-0a66805d7fb085df4"
+instance_type = "c5.4xlarge"
+
+# ── Netskope ──────────────────────────────────────────────────────────────────
+
+appliance_name = "aig-pov"
+
+# The IP or hostname this AIG instance will be reachable at.
+# Set to the private IP you expect AWS to assign, or a DNS name if you have one.
+appliance_host = "10.1.2.10"
+
+# ── Secrets Manager ───────────────────────────────────────────────────────────
+
+secret_name = "aig/prod/bootstrap"
