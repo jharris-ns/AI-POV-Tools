@@ -17,12 +17,15 @@
 #   APPLIANCE_NAME    Name used to derive resource tags (default: aig-test)
 #   SKIP_ENROLLMENT=1 Skip the Netskope enrollment poll (use with non-AIG AMIs)
 
-TF_DIR        := ../new-vpc-private
-FIXTURES      := tests/fixtures/new-vpc-private.tfvars
-TF_DIR_PUBLIC := ../new-vpc-public
+TF_DIR          := ../new-vpc-private
+FIXTURES        := tests/fixtures/new-vpc-private.tfvars
+TF_DIR_PUBLIC   := ../new-vpc-public
 FIXTURES_PUBLIC := ../new-vpc-public/tests/fixtures/new-vpc-public.tfvars
-APPLIANCE_NAME ?= aig-test
-AWS_REGION    ?= us-west-1
+TF_DIR_EXISTING := ../existing-vpc
+FIXTURES_EXISTING := ../existing-vpc/tests/fixtures/existing-vpc.tfvars
+TF_DIR_TEST_NET := ../existing-vpc/tests/fixtures/test-network
+APPLIANCE_NAME  ?= aig-test
+AWS_REGION      ?= us-west-1
 
 # Extra -var flags for integration runs. AMI_ID is optional; variables.tf default is used if unset.
 TF_EXTRA_VARS ?=
@@ -30,7 +33,7 @@ ifdef AMI_ID
   TF_EXTRA_VARS += -var="aig_ami_id=$(AMI_ID)"
 endif
 
-.PHONY: install validate plan test-static test-integration test-integration-public test-all clean
+.PHONY: install validate plan test-static test-integration test-integration-public test-integration-existing test-all clean
 
 install:
 	pip install -r requirements.txt
@@ -109,6 +112,59 @@ test-integration-public:
 	terraform -chdir=$(TF_DIR_PUBLIC) destroy -auto-approve \
 	  -var-file=$(FIXTURES_PUBLIC) \
 	  $(TF_EXTRA_VARS); \
+	exit $$PYTEST_EXIT
+
+# ── Layer 2: integration tests for existing-vpc ───────────────────────────────
+#
+# Deploys a minimal test VPC first, then existing-vpc into it.
+# VPC_ID / SUBNET_ID are passed to pytest so subnet-placement tests can verify
+# the instance landed in the correct subnet.
+
+test-integration-existing:
+	@echo "==> Initialising and deploying test-network (VPC + subnet)..."; \
+	terraform -chdir=$(TF_DIR_TEST_NET) init -input=false && \
+	terraform -chdir=$(TF_DIR_TEST_NET) apply -auto-approve || exit 1; \
+	VPC_ID=$$(terraform -chdir=$(TF_DIR_TEST_NET) output -raw vpc_id); \
+	SUBNET_ID=$$(terraform -chdir=$(TF_DIR_TEST_NET) output -raw subnet_id); \
+	echo "==> test-network: VPC=$$VPC_ID Subnet=$$SUBNET_ID"; \
+	echo "==> Initialising and deploying existing-vpc stack..."; \
+	terraform -chdir=$(TF_DIR_EXISTING) init -input=false; \
+	terraform -chdir=$(TF_DIR_EXISTING) apply -auto-approve \
+	  -var-file=$(FIXTURES_EXISTING) \
+	  -var="vpc_id=$$VPC_ID" \
+	  -var="subnet_id=$$SUBNET_ID" \
+	  -var="appliance_host=$$VPC_ID" \
+	  $(TF_EXTRA_VARS); \
+	APPLY_EXIT=$$?; \
+	if [ $$APPLY_EXIT -ne 0 ]; then \
+	  echo "==> Apply failed — destroying partial resources..."; \
+	  terraform -chdir=$(TF_DIR_EXISTING) destroy -auto-approve \
+	    -var-file=$(FIXTURES_EXISTING) \
+	    -var="vpc_id=$$VPC_ID" \
+	    -var="subnet_id=$$SUBNET_ID" \
+	    -var="appliance_host=$$VPC_ID" \
+	    $(TF_EXTRA_VARS) 2>/dev/null || true; \
+	  terraform -chdir=$(TF_DIR_TEST_NET) destroy -auto-approve 2>/dev/null || true; \
+	  exit $$APPLY_EXIT; \
+	fi; \
+	echo "==> Running integration tests (existing-vpc)..."; \
+	APPLIANCE_NAME=$(APPLIANCE_NAME) AWS_DEFAULT_REGION=$(AWS_REGION) SKIP_ENROLLMENT=$(SKIP_ENROLLMENT) \
+	  TF_DIR=$$(cd $(TF_DIR_EXISTING) && pwd) \
+	  VPC_ID=$$VPC_ID SUBNET_ID=$$SUBNET_ID \
+	  pytest test_existing_vpc.py -v \
+	    --timeout=1200 \
+	    --json-report \
+	    --json-report-file=test-results-existing.json; \
+	PYTEST_EXIT=$$?; \
+	echo "==> Destroying existing-vpc stack..."; \
+	terraform -chdir=$(TF_DIR_EXISTING) destroy -auto-approve \
+	  -var-file=$(FIXTURES_EXISTING) \
+	  -var="vpc_id=$$VPC_ID" \
+	  -var="subnet_id=$$SUBNET_ID" \
+	  -var="appliance_host=$$VPC_ID" \
+	  $(TF_EXTRA_VARS) 2>/dev/null || true; \
+	echo "==> Destroying test-network..."; \
+	terraform -chdir=$(TF_DIR_TEST_NET) destroy -auto-approve 2>/dev/null || true; \
 	exit $$PYTEST_EXIT
 
 # ── Both layers ───────────────────────────────────────────────────────────────

@@ -111,26 +111,10 @@ resource "aws_security_group" "aig" {
   }
 
   egress {
-    description = "HTTPS outbound"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "DNS UDP"
-    from_port   = 53
-    to_port     = 53
-    protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "DNS TCP"
-    from_port   = 53
-    to_port     = 53
-    protocol    = "tcp"
+    description = "All outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -145,6 +129,7 @@ resource "aws_instance" "aig" {
   subnet_id              = var.subnet_id
   iam_instance_profile   = aws_iam_instance_profile.aig.name
   vpc_security_group_ids = [aws_security_group.aig.id]
+  key_name               = var.key_name
 
   user_data = jsonencode({
     bootstrap_secret = aws_secretsmanager_secret.aig_bootstrap.name
