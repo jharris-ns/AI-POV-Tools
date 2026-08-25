@@ -1,11 +1,13 @@
 """
 Shared pytest fixtures for AIG Terraform integration tests.
 
-Requires a deployed new-vpc-private stack:
+Requires a deployed AIG stack (new-vpc-private or new-vpc-public):
   cd terraform/aig/tests && make test-integration
+  cd terraform/aig/tests && make test-integration-public
 
 Environment variables:
-  AWS_DEFAULT_REGION           — AWS region (default: us-east-1)
+  TF_DIR                       — Terraform root dir for terraform output (default: new-vpc-private)
+  AWS_DEFAULT_REGION           — AWS region (default: us-west-1)
   AWS_PROFILE                  — AWS profile (optional)
   NETSKOPE_SERVER_URL          — Required only for Netskope enrollment tests
   NETSKOPE_API_KEY             — Netskope REST API bearer token (same var as the Terraform provider)
@@ -20,10 +22,11 @@ import subprocess
 import boto3
 import pytest
 
-# Path to the new-vpc-private Terraform root, relative to this file.
-TERRAFORM_DIR = os.path.abspath(
+_default_tf_dir = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "new-vpc-private")
 )
+# TF_DIR env var allows the Makefile to point at new-vpc-public (or any other root).
+TERRAFORM_DIR = os.environ.get("TF_DIR", _default_tf_dir)
 
 
 @pytest.fixture(scope="session")
@@ -43,7 +46,7 @@ def tf_outputs():
 
 @pytest.fixture(scope="session")
 def aws_region():
-    return os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    return os.environ.get("AWS_DEFAULT_REGION", "us-west-1")
 
 
 @pytest.fixture(scope="session")

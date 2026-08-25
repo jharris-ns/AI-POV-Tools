@@ -46,6 +46,12 @@ variable "instance_type" {
   default     = "c6a.4xlarge"
 }
 
+variable "key_name" {
+  description = "EC2 key pair name for SSH access (optional)"
+  type        = string
+  default     = null
+}
+
 # ── Netskope ──────────────────────────────────────────────────────────────────
 
 variable "netskope_server_url" {

@@ -19,6 +19,8 @@
 
 TF_DIR        := ../new-vpc-private
 FIXTURES      := tests/fixtures/new-vpc-private.tfvars
+TF_DIR_PUBLIC := ../new-vpc-public
+FIXTURES_PUBLIC := ../new-vpc-public/tests/fixtures/new-vpc-public.tfvars
 APPLIANCE_NAME ?= aig-test
 AWS_REGION    ?= us-west-1
 
@@ -28,7 +30,7 @@ ifdef AMI_ID
   TF_EXTRA_VARS += -var="aig_ami_id=$(AMI_ID)"
 endif
 
-.PHONY: install validate plan test-static test-integration test-all clean
+.PHONY: install validate plan test-static test-integration test-integration-public test-all clean
 
 install:
 	pip install -r requirements.txt
@@ -75,6 +77,37 @@ test-integration:
 	echo "==> Destroying stack (always runs)..."; \
 	terraform -chdir=$(TF_DIR) destroy -auto-approve \
 	  -var-file=$(FIXTURES) \
+	  $(TF_EXTRA_VARS); \
+	exit $$PYTEST_EXIT
+
+# ── Layer 2: integration tests for new-vpc-public ─────────────────────────────
+
+test-integration-public:
+	@echo "==> Initialising Terraform (new-vpc-public)..."
+	terraform -chdir=$(TF_DIR_PUBLIC) init -input=false
+	@echo "==> Deploying new-vpc-public stack..."
+	terraform -chdir=$(TF_DIR_PUBLIC) apply -auto-approve \
+	  -var-file=$(FIXTURES_PUBLIC) \
+	  $(TF_EXTRA_VARS); \
+	APPLY_EXIT=$$?; \
+	if [ $$APPLY_EXIT -ne 0 ]; then \
+	  echo "==> Apply failed — destroying any partial resources..."; \
+	  terraform -chdir=$(TF_DIR_PUBLIC) destroy -auto-approve \
+	    -var-file=$(FIXTURES_PUBLIC) \
+	    $(TF_EXTRA_VARS); \
+	  exit $$APPLY_EXIT; \
+	fi
+	@echo "==> Running integration tests (new-vpc-public)..."
+	APPLIANCE_NAME=$(APPLIANCE_NAME) AWS_DEFAULT_REGION=$(AWS_REGION) SKIP_ENROLLMENT=$(SKIP_ENROLLMENT) \
+	  TF_DIR=$(abspath $(TF_DIR_PUBLIC)) \
+	  pytest test_new_vpc_public.py -v \
+	    --timeout=1200 \
+	    --json-report \
+	    --json-report-file=test-results-public.json; \
+	PYTEST_EXIT=$$?; \
+	echo "==> Destroying stack (always runs)..."; \
+	terraform -chdir=$(TF_DIR_PUBLIC) destroy -auto-approve \
+	  -var-file=$(FIXTURES_PUBLIC) \
 	  $(TF_EXTRA_VARS); \
 	exit $$PYTEST_EXIT
 
