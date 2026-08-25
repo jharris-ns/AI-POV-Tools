@@ -88,7 +88,7 @@ The deployment IAM policy scopes permissions by `Name` tag (`aig-*`). If a resou
 
 ## AMI not found / InvalidAMIID
 
-The AIG AMI is region-specific. If you deploy to a different region, obtain the correct AMI ID from your Netskope account team and update `aig_ami_id` in your `terraform.tfvars`.
+The AIG AMI is region-specific. Find the correct AMI ID for your region by subscribing to the Netskope AI Gateway on the AWS Marketplace — the AMI ID is displayed after you accept the subscription terms. Update `aig_ami_id` in your `terraform.tfvars` with the ID for your target region.
 
 ---
 

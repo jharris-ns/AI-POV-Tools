@@ -47,7 +47,7 @@ You need:
 - [ ] **Terraform ≥ 1.5** installed — [download here](https://developer.hashicorp.com/terraform/install)
 - [ ] **AWS credentials** configured (`aws configure` or environment variables)
 - [ ] **Netskope REST API v2 token** — Netskope tenant → Settings → Tools → REST API v2
-- [ ] **AIG AMI ID** for your target AWS region — obtain from your Netskope account team
+- [ ] **AIG AMI ID** for your target AWS region — subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms; the AMI ID is shown after subscription
 - [ ] **Deployment IAM role** created — see [Step 0 in the main README](../README.md)
 
 ---
@@ -78,7 +78,7 @@ Open `terraform.tfvars` in a text editor and fill in your values. The table belo
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `aig_ami_id` | AMI ID for the AIG appliance in your target region. Obtain from Netskope. | `"ami-0a66805d7fb085df4"` |
+| `aig_ami_id` | AMI ID for the AIG appliance in your target region. Subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms — the AMI ID is shown after subscription. | `"ami-0a66805d7fb085df4"` |
 
 #### Network fields (optional — defaults work for most POVs)
 

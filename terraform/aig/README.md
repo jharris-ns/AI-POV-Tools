@@ -31,7 +31,7 @@ Before deploying any option you need:
 | **Terraform ≥ 1.5** | [Download](https://developer.hashicorp.com/terraform/install) or `brew install terraform` |
 | **AWS credentials** | `aws configure`, AWS SSO, or environment variables |
 | **Netskope REST API v2 token** | Netskope tenant → Settings → Tools → REST API v2 → Generate token (AIG scope) |
-| **AIG AMI ID** | Provided by your Netskope account team for your target AWS region |
+| **AIG AMI ID** | Subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms — the AMI ID is region-specific and shown after subscription |
 
 Set your Netskope credentials as environment variables — never put them in a file:
 

@@ -37,7 +37,7 @@ You need:
 - [ ] **Terraform ≥ 1.5** installed — [download here](https://developer.hashicorp.com/terraform/install)
 - [ ] **AWS credentials** configured (`aws configure` or environment variables)
 - [ ] **Netskope REST API v2 token** — Netskope tenant → Settings → Tools → REST API v2
-- [ ] **AIG AMI ID** for your target AWS region — obtain from your Netskope account team
+- [ ] **AIG AMI ID** for your target AWS region — subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms; the AMI ID is shown after subscription
 - [ ] **VPC ID** — from the AWS console or `aws ec2 describe-vpcs`
 - [ ] **Subnet ID** — the subnet where the gateway will be placed; must have outbound internet access (via NAT gateway or Internet Gateway)
 - [ ] **The IP or hostname the gateway will be reachable at** — usually its private IP in the subnet
@@ -97,7 +97,7 @@ Open `terraform.tfvars` in a text editor and fill in your values. The table belo
 | `vpc_id` | ID of the existing VPC to deploy the gateway into | `"vpc-0123456789abcdef0"` |
 | `subnet_id` | ID of the existing subnet for the gateway EC2 instance | `"subnet-0123456789abcdef0"` |
 | `allowed_cidr_blocks` | List of CIDRs allowed to reach the gateway on TCP port 443 | `["10.0.0.0/8"]` |
-| `aig_ami_id` | AMI ID for the AIG appliance in your target region. Obtain from Netskope. | `"ami-0a66805d7fb085df4"` |
+| `aig_ami_id` | AMI ID for the AIG appliance in your target region. Subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms — the AMI ID is shown after subscription. | `"ami-0a66805d7fb085df4"` |
 | `appliance_host` | The IP address or hostname the gateway will be reachable at. This is registered in the Netskope tenant for display purposes. Set it to the private IP you expect the instance to receive in the subnet, or a DNS name if you have one. It does not affect the enrollment handshake. | `"10.1.2.10"` |
 
 #### AWS fields (optional)
