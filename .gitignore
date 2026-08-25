@@ -21,3 +21,6 @@ venv/
 
 # OS
 .DS_Store
+
+# Internal docs (PDFs and reference documents — not for distribution)
+docs/
