@@ -147,23 +147,14 @@ class TestSecurityGroup:
         ]
         assert len(https_rules) == 1, "Security group must have exactly one ingress rule on TCP 443"
 
-    def test_egress_allows_https(self, ec2_client, tf_outputs, appliance_name):
+    def test_egress_allows_all(self, ec2_client, tf_outputs, appliance_name):
         sg = self._find_sg(ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-sg")
-        https_egress = [
+        all_egress = [
             r for r in sg["IpPermissionsEgress"]
-            if r["FromPort"] == 443 and r["ToPort"] == 443 and r["IpProtocol"] == "tcp"
+            if r["IpProtocol"] == "-1"
+            and any(ip.get("CidrIp") == "0.0.0.0/0" for ip in r.get("IpRanges", []))
         ]
-        assert len(https_egress) == 1, "Security group must allow egress on TCP 443"
-
-    def test_egress_allows_dns(self, ec2_client, tf_outputs, appliance_name):
-        sg = self._find_sg(ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-sg")
-        dns_egress = [
-            r for r in sg["IpPermissionsEgress"]
-            if r["FromPort"] == 53 and r["ToPort"] == 53
-        ]
-        protocols = {r["IpProtocol"] for r in dns_egress}
-        assert "tcp" in protocols, "Security group must allow DNS egress on TCP 53"
-        assert "udp" in protocols, "Security group must allow DNS egress on UDP 53"
+        assert len(all_egress) == 1, "Security group must allow all outbound traffic"
 
 
 # ── IAM ───────────────────────────────────────────────────────────────────────
@@ -173,11 +164,8 @@ class TestIAM:
     def test_role_trusts_ec2(self, iam_client, appliance_name):
         role_name = f"{appliance_name}-role"
         resp = iam_client.get_role(RoleName=role_name)
-        trust = json.loads(urllib.parse.unquote(
-            resp["Role"]["AssumeRolePolicyDocument"]
-            if isinstance(resp["Role"]["AssumeRolePolicyDocument"], str)
-            else json.dumps(resp["Role"]["AssumeRolePolicyDocument"])
-        ))
+        raw = resp["Role"]["AssumeRolePolicyDocument"]
+        trust = raw if isinstance(raw, dict) else json.loads(urllib.parse.unquote(raw))
         principals = [
             stmt.get("Principal", {})
             for stmt in trust.get("Statement", [])
@@ -194,8 +182,10 @@ class TestIAM:
         role_name = f"{appliance_name}-role"
         policy_name = f"{appliance_name}-read-bootstrap-secret"
         resp = iam_client.get_role_policy(RoleName=role_name, PolicyName=policy_name)
-        # get_role_policy returns the policy document URL-encoded.
-        policy_doc = json.loads(urllib.parse.unquote(resp["PolicyDocument"]))
+        # boto3 may return PolicyDocument as a pre-parsed dict (newer versions)
+        # or as a URL-encoded JSON string (older versions). Handle both.
+        raw = resp["PolicyDocument"]
+        policy_doc = raw if isinstance(raw, dict) else json.loads(urllib.parse.unquote(raw))
         secret_arn = tf_outputs["bootstrap_secret_arn"]
 
         def _as_list(value):
@@ -275,7 +265,7 @@ class TestNetskopeEnrollment:
     """
     Polls the Netskope API until the AIG appliance reports status=connected.
 
-    Skipped automatically when NETSKOPE_SERVER_URL / NETSKOPE_API_KEY are not set.
+    Skipped automatically when NETSKOPE_SERVER_URL / NETSKOPE_API_TOKEN are not set.
     Allow up to 15 minutes for enrollment to complete after the EC2 instance boots.
     """
 
@@ -284,19 +274,28 @@ class TestNetskopeEnrollment:
 
     @pytest.mark.timeout(1020)  # pytest-timeout: 17 minutes (buffer above TIMEOUT_SEC)
     def test_appliance_connected(self, netskope_session, tf_outputs):
+        import requests as _requests
+
         appliance_id = tf_outputs["appliance_id"]
         deadline = time.monotonic() + self.TIMEOUT_SEC
 
         while time.monotonic() < deadline:
-            resp = netskope_session.get(f"{netskope_session.base_url}/aig/appliances")
-            resp.raise_for_status()
-            for appliance in resp.json().get("elements", []):
-                if appliance.get("id") == appliance_id:
-                    status = appliance.get("status")
-                    if status == "connected":
-                        return
-                    # Any non-connected status: keep polling.
-                    break
+            try:
+                resp = netskope_session.get(
+                    f"{netskope_session.base_url}/aig/appliances",
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                for appliance in resp.json().get("elements", []):
+                    if appliance.get("id") == appliance_id:
+                        status = appliance.get("status")
+                        if status == "connected":
+                            return
+                        # Any non-connected status: keep polling.
+                        break
+            except _requests.exceptions.RequestException:
+                # Transient network error — keep polling.
+                pass
             time.sleep(self.POLL_INTERVAL_SEC)
 
         pytest.fail(

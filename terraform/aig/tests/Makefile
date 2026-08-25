@@ -12,14 +12,15 @@
 #   or an IAM role / AWS profile (AWS_PROFILE).
 #
 # Optional overrides:
-#   AMI_ID       Override the AIG AMI (default: variable default in variables.tf)
-#   AWS_REGION   Override the deployment region (default: us-east-1)
-#   APPLIANCE_NAME   Name used to derive resource tags (default: aig-test)
+#   AMI_ID            Override the AIG AMI (default: variable default in variables.tf)
+#   AWS_REGION        Override the deployment region (default: us-west-1)
+#   APPLIANCE_NAME    Name used to derive resource tags (default: aig-test)
+#   SKIP_ENROLLMENT=1 Skip the Netskope enrollment poll (use with non-AIG AMIs)
 
 TF_DIR        := ../new-vpc-private
 FIXTURES      := tests/fixtures/new-vpc-private.tfvars
 APPLIANCE_NAME ?= aig-test
-AWS_REGION    ?= us-east-1
+AWS_REGION    ?= us-west-1
 
 # Extra -var flags for integration runs. AMI_ID is optional; variables.tf default is used if unset.
 TF_EXTRA_VARS ?=
@@ -55,9 +56,17 @@ test-integration:
 	@echo "==> Deploying new-vpc-private stack..."
 	terraform -chdir=$(TF_DIR) apply -auto-approve \
 	  -var-file=$(FIXTURES) \
-	  $(TF_EXTRA_VARS)
+	  $(TF_EXTRA_VARS); \
+	APPLY_EXIT=$$?; \
+	if [ $$APPLY_EXIT -ne 0 ]; then \
+	  echo "==> Apply failed — destroying any partial resources..."; \
+	  terraform -chdir=$(TF_DIR) destroy -auto-approve \
+	    -var-file=$(FIXTURES) \
+	    $(TF_EXTRA_VARS); \
+	  exit $$APPLY_EXIT; \
+	fi
 	@echo "==> Running integration tests..."
-	APPLIANCE_NAME=$(APPLIANCE_NAME) AWS_DEFAULT_REGION=$(AWS_REGION) \
+	APPLIANCE_NAME=$(APPLIANCE_NAME) AWS_DEFAULT_REGION=$(AWS_REGION) SKIP_ENROLLMENT=$(SKIP_ENROLLMENT) \
 	  pytest test_new_vpc_private.py -v \
 	    --timeout=1200 \
 	    --json-report \

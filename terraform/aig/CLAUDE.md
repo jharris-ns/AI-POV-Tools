@@ -81,6 +81,11 @@ accepts `server_url` and `api_key` arguments (mapped from Terraform
 variables) as a fallback. OAuth2 is supported via `NETSKOPE_OAUTH2_CLIENT_ID`
 and `NETSKOPE_OAUTH2_CLIENT_SECRET`.
 
+**Authentication**: `NETSKOPE_API_KEY` is passed directly as the
+`Netskope-Api-Token` header on every API call. Any test code or script
+that talks directly to the Netskope REST API must use the same env var
+and the same header name.
+
 ## Enrollment token TTL
 
 `netskope_aig_appliance_enrollment_token` is a create-only resource. The

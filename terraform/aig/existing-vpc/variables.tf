@@ -34,7 +34,7 @@ variable "aig_ami_id" {
 variable "instance_type" {
   description = "EC2 instance type for the AI Gateway"
   type        = string
-  default     = "c5.4xlarge"
+  default     = "c6a.4xlarge"
 }
 
 # ── Netskope ──────────────────────────────────────────────────────────────────

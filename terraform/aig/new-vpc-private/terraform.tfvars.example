@@ -27,7 +27,10 @@ allowed_cidr_blocks = ["10.0.0.0/16"]
 
 # Default AMI is us-east-1. Update for other regions (obtain from Netskope).
 aig_ami_id    = "ami-0a66805d7fb085df4"
-instance_type = "c5.4xlarge"
+instance_type = "c6a.4xlarge"
+
+# EC2 key pair name for SSH access (optional — omit or leave null if not needed).
+# key_name = "my-key-pair"
 
 # ── Netskope ──────────────────────────────────────────────────────────────────
 

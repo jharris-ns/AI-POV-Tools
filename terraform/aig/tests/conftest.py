@@ -5,11 +5,12 @@ Requires a deployed new-vpc-private stack:
   cd terraform/aig/tests && make test-integration
 
 Environment variables:
-  AWS_DEFAULT_REGION      — AWS region (default: us-east-1)
-  AWS_PROFILE             — AWS profile (optional)
-  NETSKOPE_SERVER_URL     — Required only for Netskope enrollment tests
-  NETSKOPE_API_KEY        — Required only for Netskope enrollment tests
-  APPLIANCE_NAME          — AIG appliance name used in deployment (default: aig-test)
+  AWS_DEFAULT_REGION           — AWS region (default: us-east-1)
+  AWS_PROFILE                  — AWS profile (optional)
+  NETSKOPE_SERVER_URL          — Required only for Netskope enrollment tests
+  NETSKOPE_API_KEY             — Netskope REST API bearer token (same var as the Terraform provider)
+  APPLIANCE_NAME               — AIG appliance name used in deployment (default: aig-test)
+  SKIP_ENROLLMENT=1            — Skip Netskope enrollment tests (use with non-AIG AMIs)
 """
 
 import json
@@ -64,9 +65,13 @@ def secretsmanager_client(aws_region):
 def netskope_session():
     """
     Returns a requests.Session pre-configured with Netskope API credentials.
-    Tests that use this fixture are automatically skipped when the environment
-    variables are not set.
+    Tests that use this fixture are automatically skipped when:
+      - NETSKOPE_SERVER_URL or NETSKOPE_API_KEY are not set, or
+      - SKIP_ENROLLMENT=1 is set (use when running with a non-AIG AMI)
     """
+    if os.environ.get("SKIP_ENROLLMENT"):
+        pytest.skip("SKIP_ENROLLMENT is set — skipping Netskope enrollment tests")
+
     server_url = os.environ.get("NETSKOPE_SERVER_URL", "").rstrip("/")
     api_key = os.environ.get("NETSKOPE_API_KEY", "")
     if not server_url or not api_key:
@@ -75,9 +80,13 @@ def netskope_session():
         )
 
     import requests
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     session = requests.Session()
     session.headers["Netskope-Api-Token"] = api_key
+    session.verify = False
     # Attach base_url as a custom attribute for convenience in tests.
     session.base_url = server_url
     return session
