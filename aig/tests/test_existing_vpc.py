@@ -2,7 +2,7 @@
 Layer 2 integration tests for the existing-vpc AIG Terraform template.
 
 These tests validate real AWS resources deployed by `terraform apply`.
-Run via: cd terraform/aig/tests && make test-integration-existing
+Run via: cd aig/tests && make test-integration-existing
 
 The existing-vpc template does NOT create VPC/subnet/networking — it deploys
 only IAM, Secrets Manager, SG, and EC2 into a pre-existing VPC. A minimal

@@ -66,7 +66,7 @@ export NETSKOPE_API_KEY="your-v2-api-token"
 ### Step 2 — Copy the configuration file
 
 ```bash
-cd terraform/aig/new-vpc-private
+cd aig/new-vpc-private
 cp terraform.tfvars.example terraform.tfvars
 ```
 

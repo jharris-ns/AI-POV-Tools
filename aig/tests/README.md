@@ -19,7 +19,7 @@ This directory contains two layers of automated tests for the three AIG deployme
 Install Python dependencies:
 
 ```bash
-cd terraform/aig/tests
+cd aig/tests
 pip install -r requirements.txt
 ```
 

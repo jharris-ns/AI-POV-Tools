@@ -1,11 +1,11 @@
 """
-Layer 2 integration tests for the new-vpc-public AIG Terraform template.
+Layer 2 integration tests for the new-vpc-private AIG Terraform template.
 
 These tests validate real AWS resources deployed by `terraform apply`.
-Run via: cd terraform/aig/tests && make test-integration-public
+Run via: cd aig/tests && make test-integration
 
 Resources are looked up by:
-  - Terraform outputs (vpc_id, instance_id, bootstrap_secret_arn, appliance_id, public_ip)
+  - Terraform outputs (vpc_id, instance_id, bootstrap_secret_arn, appliance_id)
   - Name tags derived from appliance_name (APPLIANCE_NAME env var, default: aig-test)
 """
 
@@ -29,6 +29,7 @@ class TestVPC:
         assert resp["Vpcs"][0]["CidrBlock"] == "10.0.0.0/16"
 
     def test_vpc_dns_support(self, ec2_client, tf_outputs):
+        # DNS flags are returned by describe_vpc_attribute, not describe_vpcs.
         resp = ec2_client.describe_vpc_attribute(
             VpcId=tf_outputs["vpc_id"], Attribute="enableDnsSupport"
         )
@@ -41,10 +42,10 @@ class TestVPC:
         assert resp["EnableDnsHostnames"]["Value"] is True
 
 
-# ── Subnet ────────────────────────────────────────────────────────────────────
+# ── Subnets ───────────────────────────────────────────────────────────────────
 
 
-class TestSubnet:
+class TestSubnets:
     def _find_subnet(self, ec2_client, vpc_id, name_tag):
         resp = ec2_client.describe_subnets(
             Filters=[
@@ -59,62 +60,68 @@ class TestSubnet:
         subnet = self._find_subnet(ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-public")
         assert subnet["CidrBlock"] == "10.0.0.0/24"
 
-    def test_ec2_instance_in_public_subnet(self, ec2_client, tf_outputs, appliance_name):
+    def test_private_subnet_cidr(self, ec2_client, tf_outputs, appliance_name):
+        subnet = self._find_subnet(ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-private")
+        assert subnet["CidrBlock"] == "10.0.1.0/24"
+
+    def test_nat_gateway_in_public_subnet(self, ec2_client, tf_outputs, appliance_name):
         public_subnet = self._find_subnet(
             ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-public"
         )
+        resp = ec2_client.describe_nat_gateways(
+            Filters=[
+                {"Name": "vpc-id", "Values": [tf_outputs["vpc_id"]]},
+                {"Name": "subnet-id", "Values": [public_subnet["SubnetId"]]},
+                {"Name": "state", "Values": ["available"]},
+            ]
+        )
+        assert len(resp["NatGateways"]) == 1, "NAT Gateway must be in the public subnet"
+
+    def test_ec2_instance_in_private_subnet(self, ec2_client, tf_outputs, appliance_name):
+        private_subnet = self._find_subnet(
+            ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-private"
+        )
         resp = ec2_client.describe_instances(InstanceIds=[tf_outputs["instance_id"]])
         instance = resp["Reservations"][0]["Instances"][0]
-        assert instance["SubnetId"] == public_subnet["SubnetId"], (
-            "AIG EC2 instance must be in the public subnet"
+        assert instance["SubnetId"] == private_subnet["SubnetId"], (
+            "AIG EC2 instance must be in the private subnet"
         )
 
-    def test_no_private_subnet(self, ec2_client, tf_outputs, appliance_name):
-        resp = ec2_client.describe_subnets(
-            Filters=[
-                {"Name": "vpc-id", "Values": [tf_outputs["vpc_id"]]},
-                {"Name": "tag:Name", "Values": [f"{appliance_name}-private"]},
-            ]
-        )
-        assert len(resp["Subnets"]) == 0, "new-vpc-public must not have a private subnet"
+
+# ── Route Tables ──────────────────────────────────────────────────────────────
 
 
-# ── Route Table ───────────────────────────────────────────────────────────────
-
-
-class TestRouteTable:
-    def test_public_route_table_has_igw(self, ec2_client, tf_outputs, appliance_name):
+class TestRouteTables:
+    def _find_rt(self, ec2_client, vpc_id, name_tag):
         resp = ec2_client.describe_route_tables(
             Filters=[
-                {"Name": "vpc-id", "Values": [tf_outputs["vpc_id"]]},
-                {"Name": "tag:Name", "Values": [f"{appliance_name}-rt"]},
+                {"Name": "vpc-id", "Values": [vpc_id]},
+                {"Name": "tag:Name", "Values": [name_tag]},
             ]
         )
-        assert len(resp["RouteTables"]) == 1, f"Expected one route table with Name={appliance_name}-rt"
-        rt = resp["RouteTables"][0]
+        assert len(resp["RouteTables"]) == 1, f"Expected one route table with Name={name_tag}"
+        return resp["RouteTables"][0]
+
+    def test_public_route_table_has_igw(self, ec2_client, tf_outputs, appliance_name):
+        rt = self._find_rt(ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-public-rt")
         default_routes = [
             r for r in rt["Routes"]
             if r.get("DestinationCidrBlock") == "0.0.0.0/0"
         ]
-        assert len(default_routes) == 1, "Route table must have a 0.0.0.0/0 route"
+        assert len(default_routes) == 1, "Public route table must have a 0.0.0.0/0 route"
         assert default_routes[0].get("GatewayId", "").startswith("igw-"), (
-            "Default route must point to an Internet Gateway"
+            "Public default route must point to an Internet Gateway"
         )
 
-
-# ── Elastic IP ────────────────────────────────────────────────────────────────
-
-
-class TestElasticIP:
-    def test_eip_associated_with_instance(self, ec2_client, tf_outputs):
-        public_ip = tf_outputs["public_ip"]
-        resp = ec2_client.describe_addresses(
-            Filters=[{"Name": "public-ip", "Values": [public_ip]}]
-        )
-        assert len(resp["Addresses"]) == 1, f"EIP {public_ip} must exist"
-        addr = resp["Addresses"][0]
-        assert addr.get("InstanceId") == tf_outputs["instance_id"], (
-            "EIP must be associated with the AIG EC2 instance"
+    def test_private_route_table_has_nat(self, ec2_client, tf_outputs, appliance_name):
+        rt = self._find_rt(ec2_client, tf_outputs["vpc_id"], f"{appliance_name}-private-rt")
+        default_routes = [
+            r for r in rt["Routes"]
+            if r.get("DestinationCidrBlock") == "0.0.0.0/0"
+        ]
+        assert len(default_routes) == 1, "Private route table must have a 0.0.0.0/0 route"
+        assert default_routes[0].get("NatGatewayId", "").startswith("nat-"), (
+            "Private default route must point to a NAT Gateway"
         )
 
 
@@ -175,6 +182,8 @@ class TestIAM:
         role_name = f"{appliance_name}-role"
         policy_name = f"{appliance_name}-read-bootstrap-secret"
         resp = iam_client.get_role_policy(RoleName=role_name, PolicyName=policy_name)
+        # boto3 may return PolicyDocument as a pre-parsed dict (newer versions)
+        # or as a URL-encoded JSON string (older versions). Handle both.
         raw = resp["PolicyDocument"]
         policy_doc = raw if isinstance(raw, dict) else json.loads(urllib.parse.unquote(raw))
         secret_arn = tf_outputs["bootstrap_secret_arn"]
@@ -190,7 +199,7 @@ class TestIAM:
                 and secret_arn in resources
                 and stmt.get("Effect") == "Allow"
             ):
-                return
+                return  # Found the expected statement
         pytest.fail(
             f"Inline policy {policy_name} must grant secretsmanager:GetSecretValue on {secret_arn}"
         )
@@ -229,11 +238,12 @@ class TestEC2Instance:
         instance = self._get_instance(ec2_client, tf_outputs)
         assert instance["State"]["Name"] == "running", "AIG EC2 instance must be running"
 
-    def test_instance_has_public_ip(self, ec2_client, tf_outputs):
+    def test_instance_fixed_private_ip(self, ec2_client, tf_outputs):
         instance = self._get_instance(ec2_client, tf_outputs)
-        assert instance.get("PublicIpAddress") == tf_outputs["public_ip"], (
-            "AIG instance public IP must match the allocated EIP"
+        assert instance["PrivateIpAddress"] == "10.0.1.10", (
+            "AIG instance must have fixed private IP 10.0.1.10"
         )
+        assert tf_outputs["aig_private_ip"] == "10.0.1.10"
 
     def test_instance_has_iam_profile(self, ec2_client, tf_outputs, appliance_name):
         instance = self._get_instance(ec2_client, tf_outputs)
@@ -244,11 +254,8 @@ class TestEC2Instance:
 
     def test_instance_ami(self, ec2_client, tf_outputs):
         instance = self._get_instance(ec2_client, tf_outputs)
+        # Verify the instance was launched from an AIG AMI (non-empty AMI ID).
         assert instance["ImageId"].startswith("ami-"), "Instance must have a valid AMI ID"
-
-    def test_instance_key_pair(self, ec2_client, tf_outputs):
-        instance = self._get_instance(ec2_client, tf_outputs)
-        assert instance.get("KeyName"), "AIG instance must have an SSH key pair associated"
 
 
 # ── Netskope Enrollment ───────────────────────────────────────────────────────
@@ -258,7 +265,7 @@ class TestNetskopeEnrollment:
     """
     Polls the Netskope API until the AIG appliance reports status=connected.
 
-    Skipped automatically when NETSKOPE_SERVER_URL / NETSKOPE_API_KEY are not set.
+    Skipped automatically when NETSKOPE_SERVER_URL / NETSKOPE_API_TOKEN are not set.
     Allow up to 15 minutes for enrollment to complete after the EC2 instance boots.
     """
 
@@ -284,8 +291,10 @@ class TestNetskopeEnrollment:
                         status = appliance.get("status")
                         if status == "connected":
                             return
+                        # Any non-connected status: keep polling.
                         break
             except _requests.exceptions.RequestException:
+                # Transient network error — keep polling.
                 pass
             time.sleep(self.POLL_INTERVAL_SEC)
 

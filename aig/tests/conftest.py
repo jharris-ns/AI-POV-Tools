@@ -2,8 +2,8 @@
 Shared pytest fixtures for AIG Terraform integration tests.
 
 Requires a deployed AIG stack (new-vpc-private or new-vpc-public):
-  cd terraform/aig/tests && make test-integration
-  cd terraform/aig/tests && make test-integration-public
+  cd aig/tests && make test-integration
+  cd aig/tests && make test-integration-public
 
 Environment variables:
   TF_DIR                       — Terraform root dir for terraform output (default: new-vpc-private)

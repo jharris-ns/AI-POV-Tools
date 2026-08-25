@@ -12,7 +12,7 @@ IAM, and Secrets Manager logic; only the networking layer differs.
 ## Directory structure
 
 ```
-terraform/aig/
+aig/
   README.md               # User-facing getting started guide
   CLAUDE.md               # This file
   main.tf                 # Comment-only redirect — not a Terraform root
