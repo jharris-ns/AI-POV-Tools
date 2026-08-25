@@ -1,41 +1,68 @@
-# Netskope AI Gateway — new VPC, private subnet deployment
-# ── Copy to terraform.tfvars and fill in your values ─────────────────────────
+# Netskope AI Gateway — new VPC, private subnet
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to terraform.tfvars and fill in the values marked REQUIRED.
+# All other values have working defaults and may be left as-is for most POVs.
 #
-# Netskope credentials (set as environment variables, not in this file):
+# Full documentation: new-vpc-private/README.md
+#
+# CREDENTIALS — set as environment variables, not in this file:
 #   export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
 #   export NETSKOPE_API_KEY="your-rest-api-v2-token"
+#
+# REMOTE STATE — to store Terraform state in S3 instead of locally:
+#   cp backend.hcl.example backend.hcl   # edit with your bucket details
+#   terraform init -backend-config=backend.hcl
+#   See docs/state-management.md for full instructions.
 
-# ── AWS ───────────────────────────────────────────────────────────────────────
+# ── AWS region ────────────────────────────────────────────────────────────────
+# The region to deploy into. Must match the region your AMI is available in.
+# Default: us-west-1
 
 aws_region        = "us-west-1"
-availability_zone = "us-west-1b"
+availability_zone = "us-west-1b"   # must be an AZ within aws_region
 
-# ── VPC / Networking ──────────────────────────────────────────────────────────
+# ── VPC and networking ────────────────────────────────────────────────────────
+# These CIDRs work for most POVs. Change them only if they overlap with
+# networks you need to peer or connect to this VPC.
 
-vpc_cidr            = "10.0.0.0/16"
-public_subnet_cidr  = "10.0.0.0/24"
-private_subnet_cidr = "10.0.1.0/24"
+vpc_cidr            = "10.0.0.0/16"   # address space for the new VPC
+public_subnet_cidr  = "10.0.0.0/24"  # NAT Gateway only — no AIG instances here
+private_subnet_cidr = "10.0.1.0/24"  # AIG instance lives here
 
-# Must be within private_subnet_cidr. This IP is registered in Netskope at
-# plan time and pinned to the EC2 instance.
+# Fixed private IP for the AIG instance.
+# Must be within private_subnet_cidr. This value is registered in Netskope
+# at plan time and pinned to the EC2 instance — they must match.
 aig_private_ip = "10.0.1.10"
 
-# CIDRs allowed to reach the AI Gateway on port 443.
+# CIDRs allowed to send traffic to the gateway on TCP port 443.
+# Restrict this to your corporate network or the VPC CIDR.
 allowed_cidr_blocks = ["10.0.0.0/16"]
 
-# ── EC2 ───────────────────────────────────────────────────────────────────────
+# ── EC2 instance ──────────────────────────────────────────────────────────────
 
-# Default AMI is us-east-1. Update for other regions (obtain from Netskope).
-aig_ami_id    = "ami-0a66805d7fb085df4"
+# REQUIRED: AMI ID for the AIG appliance in your target region.
+# Obtain from your Netskope account team. The default below is for us-west-1.
+aig_ami_id = "ami-0a66805d7fb085df4"
+
+# EC2 instance type. c6a.4xlarge is the recommended minimum (16 vCPU, 32 GB RAM).
+# Do not use a smaller instance type.
 instance_type = "c6a.4xlarge"
 
-# EC2 key pair name for SSH access (optional — omit or leave null if not needed).
+# EC2 key pair name for SSH access. Optional.
+# If omitted you can still access the instance via AWS Systems Manager.
 # key_name = "my-key-pair"
 
-# ── Netskope ──────────────────────────────────────────────────────────────────
+# ── Netskope appliance ────────────────────────────────────────────────────────
 
+# Display name for the appliance in the Netskope tenant.
+# Also used as the Name tag prefix for all AWS resources.
+# Rules:
+#   - 1 to 15 characters (Netskope limit)
+#   - Must start with "aig-" to match the deployment IAM policy
 appliance_name = "aig-pov"
 
 # ── Secrets Manager ───────────────────────────────────────────────────────────
 
+# Name of the Secrets Manager secret that holds the enrollment token.
+# Must start with "aig/" to match the deployment IAM policy.
 secret_name = "aig/prod/bootstrap"

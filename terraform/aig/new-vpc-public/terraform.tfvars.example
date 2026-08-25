@@ -1,33 +1,63 @@
-# Netskope AI Gateway — new VPC, public subnet deployment
-# ── Copy to terraform.tfvars and fill in your values ─────────────────────────
+# Netskope AI Gateway — new VPC, public subnet
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to terraform.tfvars and fill in the values marked REQUIRED.
+# All other values have working defaults and may be left as-is for most POVs.
 #
-# Netskope credentials (set as environment variables, not in this file):
+# Full documentation: new-vpc-public/README.md
+#
+# CREDENTIALS — set as environment variables, not in this file:
 #   export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
 #   export NETSKOPE_API_KEY="your-rest-api-v2-token"
+#
+# REMOTE STATE — to store Terraform state in S3 instead of locally:
+#   cp backend.hcl.example backend.hcl   # edit with your bucket details
+#   terraform init -backend-config=backend.hcl
+#   See docs/state-management.md for full instructions.
 
-# ── AWS ───────────────────────────────────────────────────────────────────────
+# ── AWS region ────────────────────────────────────────────────────────────────
+# The region to deploy into. Must match the region your AMI is available in.
+# Default: us-west-1
 
 aws_region        = "us-west-1"
-availability_zone = "us-west-1b"
+availability_zone = "us-west-1b"   # must be an AZ within aws_region
 
-# ── VPC / Networking ──────────────────────────────────────────────────────────
+# ── VPC and networking ────────────────────────────────────────────────────────
+# These CIDRs work for most POVs. Change them only if they overlap with
+# networks you need to connect to this VPC.
 
-vpc_cidr           = "10.0.0.0/16"
-public_subnet_cidr = "10.0.0.0/24"
+vpc_cidr           = "10.0.0.0/16"   # address space for the new VPC
+public_subnet_cidr = "10.0.0.0/24"  # AIG instance and Elastic IP live here
 
-# CIDRs allowed to reach the AI Gateway on port 443.
+# CIDRs allowed to send traffic to the gateway on TCP port 443.
+# The default allows access from anywhere. Restrict this to your network
+# for security (e.g. your corporate egress IP or VPN CIDR).
 allowed_cidr_blocks = ["0.0.0.0/0"]
 
-# ── EC2 ───────────────────────────────────────────────────────────────────────
+# ── EC2 instance ──────────────────────────────────────────────────────────────
 
-# Default AMI is us-east-1. Update for other regions (obtain from Netskope).
-aig_ami_id    = "ami-0a66805d7fb085df4"
-instance_type = "c5.4xlarge"
+# REQUIRED: AMI ID for the AIG appliance in your target region.
+# Obtain from your Netskope account team. The default below is for us-west-1.
+aig_ami_id = "ami-0a66805d7fb085df4"
 
-# ── Netskope ──────────────────────────────────────────────────────────────────
+# EC2 instance type. c6a.4xlarge is the recommended minimum (16 vCPU, 32 GB RAM).
+# Do not use a smaller instance type.
+instance_type = "c6a.4xlarge"
 
+# EC2 key pair name for SSH access. Optional.
+# If provided you can SSH directly to the instance's public Elastic IP.
+# key_name = "my-key-pair"
+
+# ── Netskope appliance ────────────────────────────────────────────────────────
+
+# Display name for the appliance in the Netskope tenant.
+# Also used as the Name tag prefix for all AWS resources.
+# Rules:
+#   - 1 to 15 characters (Netskope limit)
+#   - Must start with "aig-" to match the deployment IAM policy
 appliance_name = "aig-pov"
 
 # ── Secrets Manager ───────────────────────────────────────────────────────────
 
+# Name of the Secrets Manager secret that holds the enrollment token.
+# Must start with "aig/" to match the deployment IAM policy.
 secret_name = "aig/prod/bootstrap"

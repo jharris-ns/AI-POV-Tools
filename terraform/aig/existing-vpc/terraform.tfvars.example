@@ -1,36 +1,69 @@
 # Netskope AI Gateway — existing VPC deployment
-# ── Copy to terraform.tfvars and fill in your values ─────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to terraform.tfvars and fill in the values marked REQUIRED.
 #
-# Netskope credentials (set as environment variables, not in this file):
+# Full documentation: existing-vpc/README.md
+#
+# CREDENTIALS — set as environment variables, not in this file:
 #   export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
 #   export NETSKOPE_API_KEY="your-rest-api-v2-token"
+#
+# REMOTE STATE — to store Terraform state in S3 instead of locally:
+#   cp backend.hcl.example backend.hcl   # edit with your bucket details
+#   terraform init -backend-config=backend.hcl
+#   See docs/state-management.md for full instructions.
 
-# ── AWS ───────────────────────────────────────────────────────────────────────
+# ── AWS region ────────────────────────────────────────────────────────────────
+# The region where your existing VPC lives.
 
 aws_region = "us-west-1"
 
 # ── Existing VPC ──────────────────────────────────────────────────────────────
 
-vpc_id    = "vpc-0123456789abcdef0"
+# REQUIRED: ID of the existing VPC to deploy the gateway into.
+# Find with: aws ec2 describe-vpcs --region YOUR_REGION --output table
+vpc_id = "vpc-0123456789abcdef0"
+
+# REQUIRED: ID of the existing subnet for the gateway instance.
+# The subnet must have outbound internet access (via NAT Gateway or IGW route)
+# so the gateway can reach Netskope cloud and Secrets Manager.
+# Find with: aws ec2 describe-subnets --filters Name=vpc-id,Values=YOUR_VPC_ID
 subnet_id = "subnet-0123456789abcdef0"
 
-# CIDRs allowed to reach the AI Gateway on port 443.
+# REQUIRED: CIDRs allowed to send traffic to the gateway on TCP port 443.
+# Typically your corporate network or the VPC CIDR.
 allowed_cidr_blocks = ["10.0.0.0/8"]
 
-# ── EC2 ───────────────────────────────────────────────────────────────────────
+# ── EC2 instance ──────────────────────────────────────────────────────────────
 
-# Default AMI is us-east-1. Update for other regions (obtain from Netskope).
-aig_ami_id    = "ami-0a66805d7fb085df4"
-instance_type = "c5.4xlarge"
+# REQUIRED: AMI ID for the AIG appliance in your target region.
+# Obtain from your Netskope account team. The default below is for us-west-1.
+aig_ami_id = "ami-0a66805d7fb085df4"
 
-# ── Netskope ──────────────────────────────────────────────────────────────────
+# EC2 instance type. c6a.4xlarge is the recommended minimum (16 vCPU, 32 GB RAM).
+# Do not use a smaller instance type.
+instance_type = "c6a.4xlarge"
 
+# EC2 key pair name for SSH access. Optional.
+# key_name = "my-key-pair"
+
+# ── Netskope appliance ────────────────────────────────────────────────────────
+
+# Display name for the appliance in the Netskope tenant.
+# Also used as the Name tag prefix for all AWS resources.
+# Rules:
+#   - 1 to 15 characters (Netskope limit)
+#   - Must start with "aig-" to match the deployment IAM policy
 appliance_name = "aig-pov"
 
-# The IP or hostname this AIG instance will be reachable at.
-# Set to the private IP you expect AWS to assign, or a DNS name if you have one.
+# REQUIRED: The IP address or hostname the gateway will be reachable at.
+# This is registered in Netskope for display purposes. Set it to the private IP
+# you expect the instance to receive in the subnet, or a DNS name if you have one.
+# After apply, check the aig_private_ip output and update this if they differ.
 appliance_host = "10.1.2.10"
 
 # ── Secrets Manager ───────────────────────────────────────────────────────────
 
+# Name of the Secrets Manager secret that holds the enrollment token.
+# Must start with "aig/" to match the deployment IAM policy.
 secret_name = "aig/prod/bootstrap"

@@ -1,180 +1,81 @@
-# Netskope AI Gateway — Terraform Templates
+# Netskope AI Gateway — Terraform Deployment
 
-Automated deployment of the Netskope AI Gateway (AIG) appliance on AWS using
-the [Netskope Terraform provider](https://registry.terraform.io/providers/netskopeoss/netskope/latest)
-and AWS Secrets Manager bootstrap. No SSH access or manual CLI steps required.
+This repository provides three Terraform templates for deploying the Netskope AI Gateway (AIG) appliance on AWS. Each template uses automated Secrets Manager bootstrap — the gateway self-enrolls at first boot with no SSH or manual steps required.
 
 ---
 
-## Choose a deployment option
+## Which option should I use?
 
-| Option | Directory | When to use |
-|--------|-----------|-------------|
-| Existing VPC | `existing-vpc/` | You have a VPC and subnet already. Bring your own networking. |
-| New VPC — public subnet | `new-vpc-public/` | Quickest POV. AIG gets a public Elastic IP. Suitable when clients access the AIG directly over the internet or from a VPN terminating outside AWS. |
-| New VPC — private subnet | `new-vpc-private/` | Recommended for production-like POVs. AIG sits behind a NAT Gateway — no inbound internet exposure. Clients access via VPC peering, VPN, or other instances in the same VPC. |
-
----
-
-## Step 0: Create the deployment role (first time only)
-
-Before running any deployment template, create the scoped IAM role that
-Terraform will use. You only need to do this once per AWS account.
-
-```bash
-cd deployment-role
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars — add your IAM user/role ARN to trusted_principal_arns
-terraform init && terraform apply
+```
+Do you have an existing VPC and subnet?
+├── Yes → existing-vpc/      Deploys only the gateway into your network
+└── No  → Does the gateway need to be reachable from outside AWS?
+          ├── No  → new-vpc-private/   Recommended for production-like POVs
+          └── Yes → new-vpc-public/    Quickest path for internet-accessible demos
 ```
 
-This creates an IAM role (`aig-deployment-role`) and policy with the minimum
-permissions required to deploy, update, and destroy AIG resources. Assume this
-role before running any of the deployment templates below.
-
-```bash
-# Assume the deployment role (adjust profile/method to your AWS setup)
-aws sts assume-role \
-  --role-arn "$(terraform output -raw role_arn)" \
-  --role-session-name aig-deploy
-```
+| Option | Directory | What gets created | Best for |
+|--------|-----------|------------------|---------|
+| [Existing VPC](existing-vpc/README.md) | `existing-vpc/` | IAM role, Secrets Manager secret, security group, EC2 instance | You already have a VPC and subnet |
+| [New VPC — public](new-vpc-public/README.md) | `new-vpc-public/` | VPC, public subnet, internet gateway, Elastic IP, IAM, Secrets Manager, EC2 | Quickest POV, internet-accessible gateway |
+| [New VPC — private](new-vpc-private/README.md) | `new-vpc-private/` | VPC, public + private subnets, NAT gateway, IAM, Secrets Manager, EC2 | Production-like POV, no inbound internet exposure |
 
 ---
 
 ## Prerequisites
 
-| Requirement | Notes |
-|-------------|-------|
-| Terraform ≥ 1.5 | `brew install terraform` or [terraform.io](https://www.terraform.io/downloads) |
-| AWS credentials | `aws configure` or environment variables (`AWS_ACCESS_KEY_ID`, etc.) |
-| Netskope API credentials | REST API v2 token from your Netskope tenant (see below) |
-| AIG AMI ID | Obtain from your Netskope account team |
+Before deploying any option you need:
 
-### Netskope API token
+| Requirement | How to get it |
+|-------------|---------------|
+| **Terraform ≥ 1.5** | [Download](https://developer.hashicorp.com/terraform/install) or `brew install terraform` |
+| **AWS credentials** | `aws configure`, AWS SSO, or environment variables |
+| **Netskope REST API v2 token** | Netskope tenant → Settings → Tools → REST API v2 → Generate token (AIG scope) |
+| **AIG AMI ID** | Provided by your Netskope account team for your target AWS region |
 
-1. Log in to your Netskope tenant
-2. Go to **Settings → Tools → REST API v1 and REST API v2**
-3. Generate a REST API **v2** token with at minimum the **AIG** scope
-4. Export it as an environment variable — do not put it in your tfvars file:
+Set your Netskope credentials as environment variables — never put them in a file:
 
 ```bash
 export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
-export NETSKOPE_API_KEY="your-token-here"
+export NETSKOPE_API_KEY="your-v2-token"
 ```
 
 ---
 
-## Quick start
+## Step 0 — Create the deployment IAM role (first time per AWS account)
 
-### 1. Pick a directory and copy the example tfvars
+The `deployment-role/` template creates a least-privilege IAM role that Terraform uses to deploy AIG resources. Run this once in each AWS account before using any deployment template.
 
 ```bash
-# Choose one:
-cd existing-vpc
-cd new-vpc-public
-cd new-vpc-private
-
+cd deployment-role
 cp terraform.tfvars.example terraform.tfvars
-```
-
-### 2. Edit `terraform.tfvars`
-
-Open `terraform.tfvars` and fill in the required values. Each file has inline
-comments explaining what each variable does. The minimum required values for
-each option are:
-
-**existing-vpc**
-```hcl
-vpc_id         = "vpc-..."
-subnet_id      = "subnet-..."
-appliance_host = "10.x.x.x"     # IP or hostname the AIG will be reachable at
-aig_ami_id     = "ami-..."
-allowed_cidr_blocks = ["10.x.x.x/x"]
-```
-
-**new-vpc-public**
-```hcl
-aig_ami_id = "ami-..."           # all other values have working defaults
-```
-
-**new-vpc-private**
-```hcl
-aig_ami_id     = "ami-..."
-aig_private_ip = "10.0.1.10"    # must be within private_subnet_cidr
-```
-
-### 3. Set Netskope credentials
-
-```bash
-export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
-export NETSKOPE_API_KEY="your-token-here"
-```
-
-### 4. Deploy
-
-```bash
+# Edit terraform.tfvars — add your IAM user or role ARN to trusted_principal_arns
 terraform init
 terraform apply
 ```
 
-Terraform will:
-1. Register the AIG appliance in your Netskope tenant
-2. Generate a 24-hour enrollment token
-3. Store the token in AWS Secrets Manager
-4. Create the IAM role and instance profile
-5. Launch the EC2 instance — it reads the secret at first boot and self-enrolls
-
----
-
-## Verify enrollment
-
-Allow up to 15 minutes after the instance launches for enrollment to complete.
-
-**Option 1 — Netskope UI**
-
-Go to **Settings → Security Cloud Platform → VM Onboarding** and look for a
-green icon next to your appliance name.
-
-**Option 2 — API**
+Then assume the role before running any deployment:
 
 ```bash
-curl -s -H "Netskope-Api-Token: $NETSKOPE_API_KEY" \
-  "$NETSKOPE_SERVER_URL/aig/appliances" | jq '.elements[] | {name, status}'
+aws sts assume-role \
+  --role-arn "$(terraform -chdir=deployment-role output -raw role_arn)" \
+  --role-session-name aig-deploy
+# Export the returned credentials as environment variables
 ```
 
-A `status` of `connected` confirms successful enrollment.
+---
+
+## Deployment guides
+
+Each template has a full step-by-step guide:
+
+- **[New VPC — private subnet](new-vpc-private/README.md)** — recommended for most POVs
+- **[New VPC — public subnet](new-vpc-public/README.md)** — quickest path to a working gateway
+- **[Existing VPC](existing-vpc/README.md)** — use your own networking
 
 ---
 
-## Enrollment token TTL
+## Reference
 
-The enrollment token is valid for **24 hours** from `terraform apply`. If the
-EC2 instance has not enrolled within that window, run `terraform apply` again —
-the token resource is create-only and will generate a fresh token, which
-automatically updates the Secrets Manager secret.
-
----
-
-## Outputs
-
-All three options expose these outputs after `terraform apply`:
-
-| Output | Description |
-|--------|-------------|
-| `appliance_id` | Netskope AIG appliance UUID |
-| `instance_id` | EC2 instance ID |
-| `bootstrap_secret_arn` | Secrets Manager secret ARN |
-
-Additional outputs vary by option (e.g. `public_ip` for `new-vpc-public`,
-`nat_public_ip` + `aig_private_ip` for `new-vpc-private`).
-
----
-
-## Tear down
-
-```bash
-terraform destroy
-```
-
-The Secrets Manager secret has `recovery_window_in_days = 0` so it is deleted
-immediately, allowing the same secret name to be reused on re-deploy.
+- [Troubleshooting guide](docs/troubleshooting.md)
+- [Terraform state management](docs/state-management.md) — including remote state in S3

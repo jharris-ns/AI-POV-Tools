@@ -1,0 +1,12 @@
+# Remote state configuration for new-vpc-private
+# Copy this file to backend.hcl, fill in your values, then run:
+#   terraform init -backend-config=backend.hcl
+#
+# See docs/state-management.md for instructions on creating the S3 bucket
+# and DynamoDB table before using this file.
+
+bucket         = "my-aig-terraform-state"
+key            = "aig/new-vpc-private/terraform.tfstate"
+region         = "us-west-1"
+encrypt        = true
+dynamodb_table = "terraform-state-lock"
