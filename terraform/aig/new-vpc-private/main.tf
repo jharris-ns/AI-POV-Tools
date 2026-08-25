@@ -8,7 +8,7 @@ terraform {
     }
     netskope = {
       source  = "netskopeoss/netskope"
-      version = "~> 0.4"
+      version = "~> 0.4.8"
     }
   }
 }
