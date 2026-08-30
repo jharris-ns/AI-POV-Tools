@@ -50,7 +50,7 @@ AWS credentials via standard methods (`aws configure`, `AWS_PROFILE`, instance r
 ```bash
 # 1. Copy and edit the vars file
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars — at minimum set: aig_ami_id, image_s3_bucket, dlpod_licensekey
+# Edit terraform.tfvars — at minimum set: aig_ami_id, dlpod_ami_id, image_s3_bucket, dlpod_licensekey
 
 # 2. Upload the Guardrails image to S3
 aws s3 cp aisecurity-llm.tgz s3://my-guardrails-bucket/aisecurity-llm.tgz
@@ -76,6 +76,7 @@ terraform apply
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `aig_ami_id` | Yes | — | AIG AMI ID for your region (from AWS Marketplace) |
+| `dlpod_ami_id` | No* | `ami-0b3a14615c7e7944e` | DLPoD AMI ID — default is us-west-1; **update for other regions** |
 | `image_s3_bucket` | Yes | — | S3 bucket containing `aisecurity-llm.tgz` |
 | `dlpod_licensekey` | Yes | — | Netskope license key for DLPoD |
 | `aws_region` | No | `us-east-1` | AWS region |
@@ -88,6 +89,8 @@ terraform apply
 | `dlpod_hostname` | No | `dlp.aigw.internal` | TLS CN / DNS SAN for DLPoD cert |
 | `allowed_cidr_blocks` | No | `["0.0.0.0/0"]` | CIDRs permitted to reach AIG on port 443 |
 
+> **\* `dlpod_ami_id`** has a default but it is region-specific. The default (`ami-0b3a14615c7e7944e`) is only valid in us-west-1 — set it explicitly for any other region.
+>
 > **Note:** `guardrails_private_ip` and `dlpod_private_ip` are embedded in the AIG bootstrap secret at plan time. Changing them after `terraform apply` requires tainting the secret and AIG instance.
 
 ---
