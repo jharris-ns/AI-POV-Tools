@@ -17,3 +17,8 @@ output "bootstrap_secret_arn" {
   description = "ARN of the Secrets Manager bootstrap secret"
   value       = aws_secretsmanager_secret.aig_bootstrap.arn
 }
+
+output "security_group_id" {
+  description = "Security group ID of the AIG instance. Use this to tighten DLPoD ingress rules after the AIG is deployed — replace the broad CIDR rule with a reference to this SG."
+  value       = aws_security_group.aig.id
+}

@@ -54,10 +54,24 @@ resource "aws_secretsmanager_secret" "aig_bootstrap" {
 
 resource "aws_secretsmanager_secret_version" "aig_bootstrap" {
   secret_id = aws_secretsmanager_secret.aig_bootstrap.id
-  secret_string = jsonencode({
-    bootstrap        = true
-    enrollment_token = netskope_aig_appliance_enrollment_token.this.enrollment_token
-  })
+
+  # Base secret always includes bootstrap flag and enrollment token.
+  # AI Guardrails and DLP On-Demand blocks are added when their variables are set.
+  secret_string = jsonencode(merge(
+    {
+      bootstrap        = true
+      enrollment_token = netskope_aig_appliance_enrollment_token.this.enrollment_token
+    },
+    var.guardrails_host != "" ? {
+      ai_guardrails = { host = var.guardrails_host }
+    } : {},
+    var.dlp_host != "" && var.dlp_ca_cert_pem != "" ? {
+      dlp = {
+        host        = var.dlp_host
+        certificate = var.dlp_ca_cert_pem
+      }
+    } : {}
+  ))
 }
 
 # ── IAM: instance role scoped to this one secret ─────────────────────────────

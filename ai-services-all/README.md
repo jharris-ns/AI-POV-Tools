@@ -105,6 +105,74 @@ Use the component templates instead if you only need part of the stack, or if yo
 
 ---
 
+## Staged build — deploying components in order
+
+If you are integrating into an existing VPC, or want to validate each component before proceeding, deploy the three services separately using the individual component templates. Each template outputs the values the next stage needs.
+
+```
+Stage 1 — Guardrails          gpu-guardrails/existing-vpc/
+              │
+              │  output: ai_guardrails_host
+              ▼
+Stage 2 — DLPoD               dlpod/existing-vpc/
+              │
+              │  outputs: dlp_host, ca_cert_pem
+              ▼
+Stage 3 — AI Gateway          aig/existing-vpc/
+```
+
+### Stage 1 — Deploy Guardrails
+
+```bash
+cd gpu-guardrails/existing-vpc
+cp terraform.tfvars.example terraform.tfvars
+# Required: vpc_id, subnet_id, allowed_service_cidr, image_s3_bucket
+terraform init && terraform apply
+
+# Note the output for Stage 3
+terraform output ai_guardrails_host
+# → http://10.0.2.10:8080/invocations
+```
+
+### Stage 2 — Deploy DLPoD
+
+```bash
+cd dlpod/existing-vpc
+cp terraform.tfvars.example terraform.tfvars
+# Required: vpc_id, subnet_id, vpc_cidr, allowed_inspection_cidr,
+#           dlpod_private_ip, dlpod_licensekey
+terraform init && terraform apply
+
+# Note these outputs for Stage 3
+terraform output dlp_host
+# → https://dlp.aigw.internal
+
+terraform output -raw ca_cert_pem
+# → -----BEGIN CERTIFICATE-----\n...
+```
+
+### Stage 3 — Deploy AIG
+
+```bash
+cd aig/existing-vpc
+cp terraform.tfvars.example terraform.tfvars
+# Required: vpc_id, subnet_id, appliance_host, aig_ami_id
+# Set these from the Stage 1 and Stage 2 outputs:
+#   guardrails_host = "<ai_guardrails_host output>"
+#   dlp_host        = "<dlp_host output>"
+#   dlp_ca_cert_pem = "<ca_cert_pem output>"
+
+export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
+export NETSKOPE_API_KEY="your-v2-token"
+terraform init && terraform apply
+```
+
+The AIG bootstrap secret will include both the Guardrails and DLPoD configuration. The AIG self-enrolls at first boot and configures both services automatically.
+
+> **Why this order?** Guardrails and DLPoD must be running before the AIG is created — the AIG validates both service endpoints during enrollment. In the full-stack template this ordering is enforced automatically by readiness gates. In the staged build you enforce it manually by completing each stage before starting the next.
+
+---
+
 ## Prerequisites
 
 | Requirement | How to get it |

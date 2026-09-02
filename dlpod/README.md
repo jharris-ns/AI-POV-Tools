@@ -361,11 +361,15 @@ reboot
 
 ---
 
-## Terraform templates (coming soon)
+## Terraform templates
 
-Once DLPoD ZTP reaches general availability, this project will add:
+### Available now
 
-- **`dlpod/standalone/`** — DLPoD appliance on AWS with automated ZTP via AWS Secrets Manager (same pattern as the AIG templates).
-- **`dlpod/aig-plus-dlpod/`** — Combined AIG + DLPoD deployment, with AIG in-line inspection forwarding to DLPoD for DLP enforcement.
+| Template | Path | Use when |
+|----------|------|----------|
+| **Existing VPC** | [`existing-vpc/`](existing-vpc/README.md) | Deploy DLPoD into an existing VPC as part of a staged build |
+| **Full stack** | [`../ai-services-all/new-vpc-public/`](../ai-services-all/new-vpc-public/README.md) | Deploy AIG + Guardrails + DLPoD together in a new VPC |
 
-The `bootstrap.json` schema documented here will be embedded in the Terraform templates as part of the Secrets Manager secret, following the same automated bootstrap pattern used by the AIG templates in `aig/`.
+The `existing-vpc/` template is designed for staged builds where you deploy Guardrails first, then DLPoD, then the AIG. It outputs the CA certificate and DLP host URL that the AIG template needs. See [staged build workflow](../ai-services-all/README.md#staged-build-deploying-components-in-order).
+
+The `bootstrap.json` schema documented above is embedded in both templates via EC2 user-data, following the zero-touch provisioning pattern.

@@ -81,3 +81,33 @@ variable "secret_name" {
   type        = string
   default     = "aig/prod/bootstrap"
 }
+
+# ── AI Guardrails integration (optional) ──────────────────────────────────────
+#
+# Obtain from the gpu-guardrails/existing-vpc/ output: ai_guardrails_host
+# Leave empty to deploy the AIG without Guardrails configured.
+
+variable "guardrails_host" {
+  description = "AI Guardrails host URL (e.g. http://10.0.2.10:8080/invocations). Copy from the Guardrails template output ai_guardrails_host. Leave empty to skip Guardrails configuration in the bootstrap secret."
+  type        = string
+  default     = ""
+}
+
+# ── DLP On-Demand integration (optional) ──────────────────────────────────────
+#
+# Both dlp_host and dlp_ca_cert_pem must be set together.
+# Obtain from dlpod/existing-vpc/ outputs: dlp_host and ca_cert_pem.
+# Leave empty to deploy the AIG without DLPoD configured.
+
+variable "dlp_host" {
+  description = "DLP On-Demand host URL (e.g. https://dlp.aigw.internal). Copy from the DLPoD template output dlp_host. Leave empty to skip DLP configuration in the bootstrap secret."
+  type        = string
+  default     = ""
+}
+
+variable "dlp_ca_cert_pem" {
+  description = "DLPoD CA certificate in PEM format. Copy from the DLPoD template output ca_cert_pem (terraform output -raw ca_cert_pem). Required when dlp_host is set — the AIG uses this to verify DLPoD's TLS certificate chain."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

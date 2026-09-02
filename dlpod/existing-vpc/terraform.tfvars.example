@@ -1,0 +1,66 @@
+# Netskope DLP On-Demand — existing VPC deployment
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to terraform.tfvars and fill in the values marked REQUIRED.
+# Never commit terraform.tfvars — it contains the DLPoD license key.
+#
+# Full documentation: README.md
+
+# ── AWS region ────────────────────────────────────────────────────────────────
+
+aws_region = "us-west-1"
+
+# ── Existing VPC ──────────────────────────────────────────────────────────────
+
+# REQUIRED: ID of the VPC to deploy DLPoD into.
+# The AIG must be in the same VPC (or a VPC associated with the Route 53 private
+# hosted zone) for hostname resolution to work.
+vpc_id = "vpc-0123456789abcdef0"
+
+# REQUIRED: ID of the subnet for the DLPoD instance.
+# The subnet must have outbound internet access (NAT Gateway or IGW) for
+# nsbootstrap to reach Netskope licensing servers at first boot.
+subnet_id = "subnet-0123456789abcdef0"
+
+# REQUIRED: CIDR block of the VPC (used to compute the VPC DNS resolver address).
+vpc_cidr = "10.0.0.0/16"
+
+# REQUIRED: CIDR block allowed to reach DLPoD on TCP port 443.
+# Set to the subnet CIDR where your AIG instance lives.
+# Example: public subnet of the AIG = "10.0.1.0/24"
+allowed_inspection_cidr = "10.0.1.0/24"
+
+# SSH access (optional — DLPoD does not support SSM Session Manager)
+# allowed_ssh_cidr = "10.0.1.0/24"  # restrict to bastion subnet
+
+# ── Project ───────────────────────────────────────────────────────────────────
+
+project     = "netskope"
+environment = "dev"
+
+# ── DLPoD EC2 ─────────────────────────────────────────────────────────────────
+
+# REQUIRED: DLPoD AMI ID for your region. Default is us-west-1.
+# Obtain region-specific AMI IDs from Netskope.
+dlpod_ami_id = "ami-0b3a14615c7e7944e"
+
+# c5d.4xlarge has local NVMe SSD which speeds up nsbootstrap initialisation.
+dlpod_instance_type = "c5d.4xlarge"
+
+# REQUIRED: A free static IP from within the subnet CIDR.
+# This IP is embedded in the TLS certificate SAN — it cannot change after apply
+# without replacing the instance and regenerating certs.
+dlpod_private_ip = "10.0.2.20"
+
+# Hostname used for TLS cert, Route 53 record, and AIG bootstrap URL.
+dlpod_hostname = "dlp.aigw.internal"
+
+# REQUIRED: Netskope license key for the DLPoD appliance.
+# Set as environment variable instead of tfvars:
+#   export TF_VAR_dlpod_licensekey="your-license-key"
+dlpod_licensekey = "REPLACE-WITH-LICENSE-KEY"
+
+# Optional: SSH public key provisioned for the nsadmin user.
+# dlpod_ssh_public_key = "ssh-rsa AAAA..."
+
+# Optional: EC2 key pair for SSH access.
+# key_pair_name = "my-key-pair"
