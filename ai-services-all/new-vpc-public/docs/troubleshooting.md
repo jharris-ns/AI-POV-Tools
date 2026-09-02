@@ -231,6 +231,45 @@ terraform apply
 
 ---
 
+## terraform destroy Issues
+
+### Private subnet and AIG security group stuck deleting for hours
+
+**Symptom:** `terraform destroy` appears to hang with messages like:
+
+```
+aws_subnet.private: Still destroying... [id=subnet-xxx, 05m00s elapsed]
+aws_security_group.aig: Still destroying... [id=sg-xxx, 05m00s elapsed]
+```
+
+...continuing for 30 minutes or more (observed up to ~3 hours).
+
+**Root cause:** The VPC interface endpoints (SSM, SSMMessages, EC2Messages, CloudWatch Logs) create elastic network interfaces (ENIs) in the private subnet. AWS does not always release these ENIs promptly when the endpoints are deleted — the subnet and any security groups attached to those ENIs cannot be deleted until the ENIs are gone. This is an AWS platform behaviour, not a Terraform bug.
+
+**What to do:** Leave `terraform destroy` running. The ENIs will eventually be released by AWS and the deletion will complete on its own. Do not interrupt the process — partially destroyed state is harder to clean up. Observed wait time: up to 3 hours in the worst case.
+
+**If the destroy process was interrupted** and some resources remain, re-run destroy — Terraform will skip resources already deleted and only attempt the remainder:
+
+```bash
+terraform destroy -auto-approve
+```
+
+Terraform refreshes state against AWS on each run, so resources already deleted are automatically removed from the plan.
+
+**To check which ENIs are holding the subnet:**
+
+```bash
+aws ec2 describe-network-interfaces \
+  --filters "Name=subnet-id,Values=<subnet-id>" \
+  --region us-west-1 \
+  --query 'NetworkInterfaces[*].{ID:NetworkInterfaceId,Desc:Description,Status:Status}' \
+  --output table
+```
+
+ENIs with descriptions like `VPC Endpoint Interface vpce-xxx` are the endpoint ENIs. You can force-delete them if needed, but this is rarely necessary — AWS releases them automatically within a few hours.
+
+---
+
 ## Rebuilding Components
 
 ### Rebuild AIG only (same appliance, new token)
