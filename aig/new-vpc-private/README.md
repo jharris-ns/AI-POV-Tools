@@ -2,9 +2,11 @@
 
 This template deploys the Netskope AI Gateway into a **brand-new VPC** with the gateway in a **private subnet**. Outbound internet access is provided by a NAT Gateway — the gateway has no inbound exposure from the internet.
 
-This is the recommended option for production-like POVs. Clients (browsers, applications) reach the gateway from within the same VPC, via VPC peering, or via VPN.
+This is the recommended option for production-like POVs. Clients reach the gateway from within the same VPC, via VPC peering, or via VPN.
 
-## What gets deployed
+---
+
+## What this deploys
 
 ```
 Internet
@@ -40,73 +42,76 @@ Private subnet (10.0.1.0/24)
 
 ---
 
-## Before you start
+## Prerequisites
 
-You need:
-
-- [ ] **Terraform ≥ 1.5** installed — [download here](https://developer.hashicorp.com/terraform/install)
-- [ ] **AWS credentials** configured (`aws configure` or environment variables)
+- [ ] **Terraform ≥ 1.5** — [download here](https://developer.hashicorp.com/terraform/install)
+- [ ] **AWS CLI profile** configured — see [Environment variables](#environment-variables) below
 - [ ] **Netskope REST API v2 token** — Netskope tenant → Settings → Tools → REST API v2
-- [ ] **AIG AMI ID** for your target AWS region — subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms; the AMI ID is shown after subscription
 - [ ] **Deployment IAM role** created — see [Step 0 in the main README](../README.md)
 
 ---
 
-## Setup
+## Environment variables
 
-### Step 1 — Set Netskope credentials
-
-Set these in your terminal session. Do not put them in any file.
+Set these in your terminal before running any Terraform command. Do not put them in `terraform.tfvars`.
 
 ```bash
 export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
 export NETSKOPE_API_KEY="your-v2-api-token"
 ```
 
-### Step 2 — Copy the configuration file
+**AWS credentials:** A configured AWS CLI profile is required. If you haven't set one up, follow the [AWS CLI configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html). Terraform picks up your default profile automatically — to use a named profile, run `export AWS_PROFILE=your-profile-name` before applying.
+
+---
+
+## Quick start
+
+All variables have working defaults for us-west-1 — no required fields to fill in for a basic deployment.
 
 ```bash
-cd aig/new-vpc-private
 cp terraform.tfvars.example terraform.tfvars
+# Optionally edit terraform.tfvars to change the region or restrict allowed_cidr_blocks
+
+terraform init
+terraform apply
 ```
 
-### Step 3 — Edit `terraform.tfvars`
+---
 
-Open `terraform.tfvars` in a text editor and fill in your values. The table below documents every field.
+## Variables reference
 
-#### Required fields
+### Required
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `aig_ami_id` | AMI ID for the AIG appliance in your target region. Subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms — the AMI ID is shown after subscription. | `"ami-0a66805d7fb085df4"` |
+This template has no required fields — all variables have working defaults for us-west-1.
 
-#### Network fields (optional — defaults work for most POVs)
+### Network (optional)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `aws_region` | `"us-west-1"` | AWS region to deploy into. Must match the region your AMI is available in. |
-| `availability_zone` | `"us-west-1b"` | Availability zone for the subnets. Must be within `aws_region`. |
-| `vpc_cidr` | `"10.0.0.0/16"` | IP address range for the new VPC. Change if this overlaps with existing networks you need to peer or connect to. |
-| `public_subnet_cidr` | `"10.0.0.0/24"` | CIDR for the public subnet (NAT Gateway only — no AIG instances here). Must be within `vpc_cidr`. |
-| `private_subnet_cidr` | `"10.0.1.0/24"` | CIDR for the private subnet (AIG instance). Must be within `vpc_cidr` and not overlap with `public_subnet_cidr`. |
-| `aig_private_ip` | `"10.0.1.10"` | Fixed private IP for the AIG instance. Must be within `private_subnet_cidr`. This IP is registered in Netskope at plan time and pinned to the EC2 instance — they must match. |
-| `allowed_cidr_blocks` | `["10.0.0.0/16"]` | List of CIDRs that are allowed to reach the gateway on TCP port 443. Typically your corporate network or VPC CIDR. |
+| `aws_region` | `"us-west-1"` | AWS region to deploy into |
+| `availability_zone` | `"us-west-1b"` | Availability zone for the subnets — must be within `aws_region` |
+| `vpc_cidr` | `"10.0.0.0/16"` | IP address range for the new VPC |
+| `public_subnet_cidr` | `"10.0.0.0/24"` | CIDR for the public subnet (NAT Gateway only) |
+| `private_subnet_cidr` | `"10.0.1.0/24"` | CIDR for the private subnet (AIG instance) |
+| `aig_private_ip` | `"10.0.1.10"` | Fixed private IP for the AIG instance — must be within `private_subnet_cidr`. Registered in Netskope at plan time and pinned to the EC2 instance — they must match. |
+| `allowed_cidr_blocks` | `["10.0.0.0/16"]` | CIDRs allowed to reach the gateway on TCP 443. Typically your corporate network or VPC CIDR. |
 
-#### EC2 fields (optional)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `instance_type` | `"c6a.4xlarge"` | EC2 instance size. `c6a.4xlarge` is the recommended minimum. Do not use a smaller instance type — the AIG requires at least 16 vCPU and 32 GB RAM. |
-| `key_name` | _(none)_ | EC2 key pair name for SSH access. Optional — if omitted you can still access the instance via AWS Systems Manager Session Manager. |
-
-#### Netskope and naming fields (optional)
+### EC2 (optional)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `appliance_name` | `"aig-pov"` | Display name for the appliance in the Netskope tenant. Also used as the prefix for all AWS resource Name tags. Must be 1–15 characters (Netskope limit). Must start with `aig-` to match the deployment IAM policy. |
+| `aig_ami_id` | _(auto from region map)_ | AMI ID for the AIG appliance. Auto-selected for: us-east-2, us-west-1, us-west-2, eu-central-1, ap-southeast-1. Set explicitly for any other region. |
+| `instance_type` | `"c6a.4xlarge"` | EC2 instance size. `c6a.4xlarge` is the recommended minimum — the AIG requires at least 16 vCPU and 32 GB RAM. |
+| `key_name` | _(none)_ | EC2 key pair name for SSH access. Optional — if omitted, use AWS Systems Manager Session Manager. |
+
+### Netskope and naming (optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `appliance_name` | `"aig-pov"` | Display name in the Netskope tenant and prefix for all AWS resource Name tags. Must be 1–15 characters and start with `aig-` to match the deployment IAM policy. |
 | `secret_name` | `"aig/prod/bootstrap"` | Secrets Manager secret name. Must start with `aig/` to match the deployment IAM policy. |
 
-> **Note:** `NETSKOPE_SERVER_URL` and `NETSKOPE_API_KEY` are read from environment variables. You can set them in `terraform.tfvars` instead as `netskope_server_url` and `netskope_api_key`, but environment variables are safer — the tfvars file is not encrypted.
+> `NETSKOPE_SERVER_URL` and `NETSKOPE_API_KEY` are read from environment variables. You can set them in `terraform.tfvars` as `netskope_server_url` and `netskope_api_key` instead, but environment variables are safer — the tfvars file is not encrypted.
 
 ---
 
@@ -117,60 +122,33 @@ By default Terraform stores state locally in `terraform.tfstate`. For team use o
 ```bash
 cp backend.hcl.example backend.hcl
 # Edit backend.hcl — fill in your S3 bucket name and region
+terraform init -backend-config=backend.hcl
 ```
 
-See [docs/state-management.md](../docs/state-management.md) for instructions on creating the S3 bucket and DynamoDB lock table before this step.
+See [docs/state-management.md](../docs/state-management.md) for instructions on creating the S3 bucket and DynamoDB lock table.
 
 ---
 
 ## Deploy
 
-### Initialise Terraform
-
 ```bash
 terraform init
-```
-
-If using remote state:
-```bash
-terraform init -backend-config=backend.hcl
-```
-
-### Preview the changes
-
-```bash
-terraform plan
-```
-
-Read through the plan. It should show approximately 14 resources being created. No changes are made at this stage.
-
-### Apply
-
-```bash
+terraform plan   # review — should show ~14 resources being created
 terraform apply
 ```
 
-Type `yes` when prompted. The deployment takes approximately 3–5 minutes, most of which is the NAT Gateway provisioning.
+The deployment takes approximately 3–5 minutes, most of which is NAT Gateway provisioning.
 
 When complete, Terraform prints the outputs:
-
-```
-appliance_id         = "01ab23cd-..."
-aig_private_ip       = "10.0.1.10"
-bootstrap_secret_arn = "arn:aws:secretsmanager:..."
-instance_id          = "i-0abc123..."
-nat_public_ip        = "52.x.x.x"
-vpc_id               = "vpc-0abc123..."
-```
 
 | Output | What it means |
 |--------|---------------|
 | `appliance_id` | The AIG appliance UUID in your Netskope tenant |
 | `aig_private_ip` | Private IP of the gateway instance |
-| `nat_public_ip` | Public IP the gateway uses for outbound traffic (add this to any allow-lists) |
+| `nat_public_ip` | Public IP the gateway uses for outbound traffic — add to network allow-lists if needed |
 | `instance_id` | EC2 instance ID (for use with AWS console or SSM) |
 | `bootstrap_secret_arn` | ARN of the Secrets Manager secret |
-| `vpc_id` | VPC ID (needed if you configure VPC peering later) |
+| `vpc_id` | VPC ID — needed if you configure VPC peering later |
 
 ---
 
@@ -178,40 +156,36 @@ vpc_id               = "vpc-0abc123..."
 
 Allow up to **15 minutes** after `terraform apply` completes for the gateway to boot and enroll.
 
-**Check via API:**
 ```bash
 curl -s -H "Netskope-Api-Token: $NETSKOPE_API_KEY" \
   "$NETSKOPE_SERVER_URL/aig/appliances" \
   | jq '.elements[] | {name, status}'
 ```
 
-A `"status": "connected"` response confirms successful enrollment.
-
-**Check via Netskope UI:**
-Go to **Settings → Security Cloud Platform → VM Onboarding** and look for a green connected icon next to your appliance name.
+A `"status": "connected"` response confirms successful enrollment. You can also check via **Settings → Security Cloud Platform → VM Onboarding** in the Netskope UI.
 
 ---
 
 ## Configure AI providers
 
-Once enrolled, assign AI providers to the gateway in the Netskope tenant:
+Once enrolled:
 
 1. Go to **Settings → Security Cloud Platform → AI Gateways**
 2. Select your appliance
 3. Add AI providers (OpenAI, Anthropic, etc.)
-4. Configure clients to send traffic to `https://10.0.1.10` (or whichever `aig_private_ip` you set)
+4. Configure clients to send traffic to `https://<aig_private_ip>` on port 443
 
 ---
 
-## Re-enrollment (if the token expires)
+## Re-enrollment
 
-The enrollment token is valid for **24 hours**. If the gateway has not enrolled within that window, regenerate the token:
+The enrollment token is valid for **24 hours**. If the gateway has not enrolled within that window:
 
 ```bash
 terraform apply
 ```
 
-Terraform replaces the token resource, updates the secret, and the gateway will pick up the new token on next boot.
+Terraform replaces the token resource, updates the secret, and the gateway picks up the new token on next boot.
 
 ---
 
@@ -221,7 +195,7 @@ Terraform replaces the token resource, updates the secret, and the gateway will 
 terraform destroy
 ```
 
-Type `yes` when prompted. All AWS and Netskope resources created by this template are removed. The Secrets Manager secret is deleted immediately (no recovery window) so the same secret name can be reused immediately.
+All AWS and Netskope resources created by this template are removed. The Secrets Manager secret is deleted immediately (no recovery window) so the same secret name can be reused right away.
 
 ---
 

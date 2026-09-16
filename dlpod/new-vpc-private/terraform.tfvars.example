@@ -74,16 +74,9 @@ dns_primary = "10.0.0.2"
 # Secondary DNS server. Leave empty to omit.
 # dns_secondary = "8.8.8.8"
 
-# Interface mode: true = DHCP (recommended for EC2), false = static.
-# On AWS EC2 leave this true — the hypervisor NIC is always DHCP-assigned.
-interface_dhcp = true
-
-# Required only when interface_dhcp = false:
-# static_ip      = "192.168.1.50"
-# static_gw      = "192.168.1.1"
-# static_netmask = "255.255.255.0"
-
 # Appliance hostname. Leave empty to let cloud-init set it (recommended for EC2).
+# Set to a FQDN if the AIG must connect to DLPoD by hostname rather than by IP.
+# When set, dlp_host output uses https://<hostname> and the TLS cert includes a DNS SAN.
 # system_hostname = "dlpod-pov.example.com"
 
 # IANA timezone. Leave empty to use the appliance default (UTC).

@@ -19,7 +19,7 @@ No SSH access is needed at any point. All instance access is via SSM Session Man
 
 ---
 
-## What gets deployed
+## What this deploys
 
 ```
 Internet
@@ -95,16 +95,34 @@ Internet
 
 ## Prerequisites
 
-| Requirement | How to get it |
-|-------------|---------------|
-| **Terraform ≥ 1.5** | `brew install terraform` or [download](https://developer.hashicorp.com/terraform/install) |
-| **AWS credentials** | `aws configure`, AWS SSO, or environment variables |
-| **GPU instance quota** | EC2 service quota for `g4dn` or `g5` in your target region — AWS console → Service Quotas → EC2 |
-| **Netskope REST API v2 token** | Netskope tenant → Settings → Tools → REST API v2 → Generate token (AIG scope) |
-| **AIG AMI ID** | Subscribe to the Netskope AI Gateway on AWS Marketplace — AMI ID is region-specific, shown after accepting terms |
-| **DLPoD AMI ID** | Obtained from Netskope. Default in `terraform.tfvars.example` is for us-west-1 — update for other regions |
-| **DLPoD license key** | Obtained from Netskope |
-| **S3 bucket with Guardrails image** | Upload `aisecurity-llm.tgz` to an S3 bucket in the same region before running `terraform apply` |
+- [ ] **Terraform ≥ 1.5** — [download here](https://developer.hashicorp.com/terraform/install)
+- [ ] **AWS CLI profile** configured — see [Environment variables](#environment-variables) below
+- [ ] **GPU instance quota** for `g4dn` or `g5` in your target region — AWS console → Service Quotas → EC2
+- [ ] **Netskope REST API v2 token** — Netskope tenant → Settings → Tools → REST API v2
+- [ ] **AIG AMI ID** — subscribe to the Netskope AI Gateway on AWS Marketplace; AMI ID is region-specific, shown after accepting terms
+- [ ] **DLPoD license key** — obtain from Netskope
+- [ ] **S3 bucket with Guardrails image** — upload `aisecurity-llm.tgz` to an S3 bucket in the same region before running `terraform apply`
+
+---
+
+## Environment variables
+
+Set these before running any Terraform command. Do not put them in `terraform.tfvars`.
+
+```bash
+export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
+export NETSKOPE_API_KEY="your-rest-api-v2-token"
+```
+
+**AWS credentials:** A configured AWS CLI profile is required. If you haven't set one up, follow the [AWS CLI configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html). Terraform picks up your default profile automatically — to use a named profile, run `export AWS_PROFILE=your-profile-name` before applying.
+
+**DLPoD license key:** The `dlpod_licensekey` variable is marked sensitive. Pass it via environment variable rather than putting it in `terraform.tfvars`:
+
+```bash
+export TF_VAR_dlpod_licensekey="your-dlpod-license-key"
+```
+
+Or set it in `terraform.tfvars` (the file is gitignored). Either approach works.
 
 ---
 
@@ -113,19 +131,82 @@ Internet
 ```bash
 # 1. Copy and fill in variables
 cp terraform.tfvars.example terraform.tfvars
-# Required: aig_ami_id, dlpod_ami_id, availability_zone, image_s3_bucket, dlpod_licensekey
+# Required: availability_zone, image_s3_bucket
+# Set dlpod_licensekey via TF_VAR_dlpod_licensekey or in terraform.tfvars
 
 # 2. Upload the Guardrails Docker image to S3
 aws s3 cp aisecurity-llm.tgz s3://my-guardrails-bucket/aisecurity-llm.tgz
 
-# 3. Set Netskope credentials
-export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
-export NETSKOPE_API_KEY="your-v2-token"
+# 3. Set environment variables (see above)
 
 # 4. Deploy
 terraform init
 terraform apply
 ```
+
+---
+
+## Variables reference
+
+### Required — no working default
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `availability_zone` | Availability zone for all subnets — must be valid for `aws_region` | `"us-east-1a"` |
+| `aig_ami_id` | AMI ID for the AIG appliance in your region. Subscribe on AWS Marketplace and accept the terms. | `"ami-0a66805d7fb085df4"` |
+| `image_s3_bucket` | S3 bucket containing `aisecurity-llm.tgz`. Must exist and be accessible before `terraform apply`. | `"my-guardrails-bucket"` |
+| `dlpod_licensekey` | Netskope license key for the DLPoD appliance (sensitive — use `TF_VAR_dlpod_licensekey`) | — |
+
+### AWS and networking (optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `aws_region` | `"us-east-1"` | AWS region to deploy all resources |
+| `vpc_cidr` | `"10.0.0.0/16"` | CIDR for the new VPC |
+| `public_subnet_cidr` | `"10.0.1.0/24"` | Public subnet — hosts the AIG (EIP) and NAT Gateway |
+| `private_subnet_cidr` | `"10.0.2.0/24"` | Private subnet — hosts Guardrails and DLPoD |
+| `allowed_cidr_blocks` | `["0.0.0.0/0"]` | CIDRs allowed to reach the AIG on TCP 443. Restrict to your corporate network for security. |
+
+### AIG — Netskope (optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `netskope_server_url` | `""` | Netskope tenant API URL. Prefer `NETSKOPE_SERVER_URL` env var. |
+| `netskope_api_key` | `""` | Netskope API v2 token (sensitive). Prefer `NETSKOPE_API_KEY` env var. |
+| `appliance_name` | `"aig-pov"` | AIG display name in Netskope tenant (1–15 characters) |
+| `secret_name` | `"aig/prod/bootstrap"` | Secrets Manager secret name. Must start with `aig/`. |
+
+### AIG — EC2 (optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `aig_instance_type` | `"c6a.4xlarge"` | AIG EC2 instance type — 16 vCPU / 32 GB minimum |
+| `aig_key_name` | _(none)_ | EC2 key pair for AIG SSH access. Optional. |
+
+### Guardrails (optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `project` | `"guardrails"` | Project identifier used in resource names and tags |
+| `environment` | `"dev"` | Environment tag (`dev`, `staging`, `prod`) |
+| `guardrails_instance_type` | `"g4dn.xlarge"` | GPU instance type. Use `g5.xlarge` for higher throughput. |
+| `volume_size_gb` | `100` | Root EBS volume size in GB (minimum 80) |
+| `guardrails_private_ip` | `"10.0.2.10"` | Fixed private IP — embedded in AIG bootstrap secret at plan time; do not change after apply |
+| `guardrails_key_pair_name` | `""` | EC2 key pair for Guardrails SSH access. Leave empty for SSM only. |
+| `image_s3_key` | `"aisecurity-llm.tgz"` | S3 object key for the Guardrails image tarball |
+
+### DLPoD (optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `dlpod_appliance_name` | `"dlpod-pov"` | DLPoD Name tag prefix |
+| `dlpod_ami_id` | `"ami-0b3a14615c7e7944e"` | DLPoD AMI — default is us-west-1; update for other regions |
+| `dlpod_instance_type` | `"m5.2xlarge"` | DLPoD EC2 instance type. `c5d.4xlarge` recommended for faster bootstrap. |
+| `dlpod_private_ip` | `"10.0.2.20"` | Fixed private IP — embedded in AIG bootstrap secret at plan time; do not change after apply |
+| `dlpod_persona` | `"dlp-on-demand"` | DLPoD persona (`dlp-on-demand` or `dspm`) |
+| `dlpod_hostname` | `"dlp.aigw.internal"` | TLS hostname and Route 53 record name for DLPoD |
+| `dlpod_key_name` | _(none)_ | EC2 key pair for DLPoD SSH access. Optional. |
+| `bastion_key_name` | _(none)_ | EC2 key pair for bastion SSH access. Optional. |
 
 ---
 
@@ -257,3 +338,13 @@ terraform apply \
 ```
 
 See [docs/troubleshooting.md](docs/troubleshooting.md) for DLPoD and Guardrails rebuild procedures.
+
+---
+
+## Tear down
+
+```bash
+terraform destroy
+```
+
+Type `yes` when prompted. All AWS and Netskope resources created by this template are removed. The bastion instance is included — there is no need to remove `bastion.tf` before destroying.

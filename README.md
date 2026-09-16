@@ -6,6 +6,18 @@ This repository contains Terraform templates and supporting documentation for de
 
 ## Modules
 
+### AI Services — All (AIG + Guardrails + DLPoD)
+
+Deploys the complete Netskope AI Services stack — AI Gateway, AI Guardrails GPU service, and DLP On-Demand — in a single `terraform apply`. All three appliances are zero-touch provisioned and wired together automatically.
+
+| Option | Directory | Best for |
+|--------|-----------|---------|
+| [New VPC — public AIG](ai-services-all/new-vpc-public/README.md) | `ai-services-all/new-vpc-public/` | Starting from scratch; full stack in a new VPC, AIG with public Elastic IP |
+
+**Use this when** you want the full AIG + Guardrails + DLPoD stack running as quickly as possible in a fresh AWS environment. For deployments where the components are deployed separately or into existing infrastructure, use the individual module templates below.
+
+---
+
 ### AI Gateway (AIG)
 
 The AI Gateway inspects and controls AI traffic, providing visibility and policy enforcement for generative AI tools such as ChatGPT, Copilot, and custom LLM applications.
@@ -26,28 +38,31 @@ The gateway self-enrolls at first boot using an enrollment token stored in AWS S
 
 ### AI Guardrails — GPU
 
-AI Guardrails runs an NVIDIA GPU-backed LLM service that the AIG appliance uses for inline AI content inspection. This module deploys the Guardrails Docker container on an Ubuntu 22.04 EC2 GPU instance and registers it with the AI Gateway.
-
-Two deployment options are provided:
+AI Guardrails runs an NVIDIA GPU-backed LLM service that the AIG appliance uses for inline AI content inspection. This module deploys the Guardrails Docker container on an Ubuntu 22.04 EC2 GPU instance.
 
 | Option | Directory | Best for |
 |--------|-----------|---------|
 | [Existing VPC](gpu-guardrails/existing-vpc/README.md) | `gpu-guardrails/existing-vpc/` | You already have a VPC and subnet with outbound internet access |
 | [New VPC — private subnet](gpu-guardrails/new-vpc-private/README.md) | `gpu-guardrails/new-vpc-private/` | Starting from scratch; GPU instance in a private subnet behind NAT |
 
-Setup is automated via a two-phase UserData script — NVIDIA drivers are installed and the instance reboots, then Docker and the Guardrails container are started automatically. The service is registered with AIGW via the AI Gateway CLI after the health check passes.
+Setup is automated via a two-phase UserData script — NVIDIA drivers are installed and the instance reboots, then Docker and the Guardrails container are started automatically.
 
 **Start here:** [gpu-guardrails/README.md](gpu-guardrails/README.md)
 
 ---
 
-### DLP On-Demand (DLPoD) — Coming soon
+### DLP On-Demand (DLPoD)
 
-DLPoD provides cloud-delivered data loss prevention inspection. Standalone DLPoD deployment templates and combined AIG + DLPoD templates will be added to this toolkit once the new DLPoD Zero-Touch Provisioning (ZTP) bootstrap support reaches general availability.
+DLPoD provides cloud-delivered data loss prevention inspection. The appliance is zero-touch provisioned via EC2 user-data — no SSH or manual console steps are required.
 
-ZTP allows the DLPoD appliance to self-configure at first boot from a structured JSON payload delivered via cloud-init user-data — the same pattern used by AIG today. The `bootstrap.json` schema, platform delivery instructions, and field-level documentation are available now in anticipation of the Terraform templates:
+| Option | Directory | Best for |
+|--------|-----------|---------|
+| [Existing VPC](dlpod/existing-vpc/README.md) | `dlpod/existing-vpc/` | You already have a VPC and subnet; includes Route 53 for AIG → DLPoD hostname resolution |
+| [New VPC — private subnet](dlpod/new-vpc-private/README.md) | `dlpod/new-vpc-private/` | Starting from scratch; DLPoD in a private subnet behind NAT |
 
-**Reference:** [dlpod/README.md](dlpod/README.md)
+Both templates generate a TLS certificate chain and output `dlp_host` and `ca_cert_pem` — the two values the AIG template needs to configure the DLPoD connection.
+
+**Start here:** [dlpod/README.md](dlpod/README.md)
 
 ---
 
@@ -55,32 +70,32 @@ ZTP allows the DLPoD appliance to self-configure at first boot from a structured
 
 ```
 AI-POV-Tools/
-  README.md                    # This file — project overview and navigation
-  aig/                         # AI Gateway Terraform templates
-    README.md                  # AIG overview and template selection guide
-    deployment-role/           # Run once: least-privilege IAM role for deployment
-    existing-vpc/              # AIG in an existing VPC and subnet
-    new-vpc-public/            # AIG in a new VPC with a public subnet and EIP
-    new-vpc-private/           # AIG in a new VPC with a private subnet and NAT GW
-    tests/                     # Automated regression tests (Layer 1 + Layer 2)
-    docs/                      # Troubleshooting and state management guides
-  gpu-guardrails/              # AI Guardrails GPU Terraform templates
-    README.md                  # Guardrails overview, two-phase setup, and AIGW registration
-    existing-vpc/              # GPU instance in an existing VPC and subnet
-    new-vpc-private/           # GPU instance in a new VPC with a private subnet and NAT GW
-  dlpod/
-    README.md                  # DLPoD ZTP bootstrap reference (templates coming soon)
-  docs/                        # Source PDFs and reference documents
+  README.md                      # This file — project overview and navigation
+  ai-services-all/
+    new-vpc-public/               # Full stack: AIG (public EIP) + Guardrails + DLPoD in one apply
+  aig/                            # AI Gateway Terraform templates
+    README.md                     # AIG overview and template selection guide
+    deployment-role/              # Run once: least-privilege IAM role for deployment
+    existing-vpc/                 # AIG in an existing VPC and subnet
+    new-vpc-public/               # AIG in a new VPC with a public subnet and EIP
+    new-vpc-private/              # AIG in a new VPC with a private subnet and NAT GW
+    docs/                         # Troubleshooting and state management guides
+  gpu-guardrails/                 # AI Guardrails GPU Terraform templates
+    README.md                     # Guardrails overview, two-phase setup, and AIGW registration
+    existing-vpc/                 # GPU instance in an existing VPC and subnet
+    new-vpc-private/              # GPU instance in a new VPC with a private subnet and NAT GW
+  dlpod/                          # DLP On-Demand Terraform templates
+    README.md                     # DLPoD ZTP bootstrap reference
+    existing-vpc/                 # DLPoD in an existing VPC, with Route 53 for hostname TLS
+    new-vpc-private/              # DLPoD in a new VPC with a private subnet and NAT GW
 ```
 
 ---
 
 ## Common prerequisites
 
-| Requirement | How to get it |
-|-------------|---------------|
-| **Terraform ≥ 1.5** | [Download](https://developer.hashicorp.com/terraform/install) or `brew install terraform` |
-| **AWS credentials** | `aws configure`, AWS SSO, or environment variables |
-| **Netskope REST API v2 token** | Netskope tenant → Settings → Tools → REST API v2 (required for AIG; not required for Guardrails) |
+- **Terraform ≥ 1.5** — [download here](https://developer.hashicorp.com/terraform/install) or `brew install terraform`
+- **AWS CLI profile** configured — follow the [AWS CLI configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html); Terraform picks up your default profile automatically
+- **Netskope REST API v2 token** — required for AIG templates; not required for standalone Guardrails or DLPoD templates. Obtain from your Netskope tenant → Settings → Tools → REST API v2
 
-See the module-specific README for additional requirements.
+See the module-specific README for additional requirements (AMI IDs, license keys, GPU instance quotas).
