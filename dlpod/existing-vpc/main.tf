@@ -103,6 +103,18 @@ resource "tls_locally_signed_cert" "dlpod" {
 # ── Locals ────────────────────────────────────────────────────────────────────
 
 locals {
+  # ── AMI map ───────────────────────────────────────────────────────────────────
+  # DLPoD 141 AMIs per region. Override with var.dlpod_ami_id for other regions.
+  dlpod_ami_map = {
+    us-east-2      = "ami-0243cf88485fd4bc6"
+    us-west-1      = "ami-0854b3cf767442e81"
+    us-west-2      = "ami-0f4949c5514a641b5"
+    eu-central-1   = "ami-08fdd8e9b27d936fb"
+    ap-southeast-1 = "ami-0dcf398010bb5985a"
+  }
+
+  dlpod_ami_id = coalesce(var.dlpod_ami_id, lookup(local.dlpod_ami_map, var.aws_region, null))
+
   name_prefix = "${var.project}-${var.environment}"
 
   # Extract the parent DNS zone from dlpod_hostname
@@ -240,7 +252,7 @@ resource "aws_route53_record" "dlpod" {
 # significantly. Reduce to 3000 IOPS after bootstrap completes if cost matters.
 
 resource "aws_instance" "dlpod" {
-  ami                    = var.dlpod_ami_id
+  ami                    = local.dlpod_ami_id
   instance_type          = var.dlpod_instance_type
   subnet_id              = var.subnet_id
   private_ip             = var.dlpod_private_ip

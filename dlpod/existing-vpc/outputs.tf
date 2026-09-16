@@ -9,12 +9,12 @@ output "private_ip" {
 }
 
 output "dlp_host" {
-  description = "DLP host URL to pass to the AIG template as dlp_host. The AIG bootstrap secret uses this URL to forward DLP inspection traffic to DLPoD. Value: https://<dlpod_hostname>"
+  description = "DLP host URL for the AIG bootstrap secret dlp.host field. The AIG resolves this hostname against the DLPoD TLS certificate DNS SAN — Route 53 resolves dlpod_hostname to the DLPoD private IP within the VPC. Retrieve with: terraform output -raw dlp_host"
   value       = "https://${var.dlpod_hostname}"
 }
 
 output "ca_cert_pem" {
-  description = "DLPoD CA certificate in PEM format. Pass this to the AIG template as dlp_ca_cert_pem — the AIG uses it as a trust anchor to verify DLPoD's TLS certificate chain. Retrieve with: terraform output -raw ca_cert_pem"
+  description = "DLPoD CA certificate in PEM format. Pass to the AIG bootstrap secret as dlp.certificate so the AIG can verify the DLPoD TLS chain. Retrieve with: terraform output -raw ca_cert_pem"
   value       = tls_self_signed_cert.dlpod_ca.cert_pem
 }
 

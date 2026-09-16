@@ -71,9 +71,9 @@ variable "environment" {
 # ── DLPoD EC2 ─────────────────────────────────────────────────────────────────
 
 variable "dlpod_ami_id" {
-  description = "AMI ID for the Netskope DLPoD appliance. AMI IDs are region-specific — obtain from Netskope. Default is us-west-1; update for other regions."
+  description = "AMI ID for the Netskope DLPoD 141 appliance. If null, the AMI is looked up from the built-in region map (us-east-2, us-west-1, us-west-2, eu-central-1, ap-southeast-1). Set explicitly for any other region."
   type        = string
-  default     = "ami-0b3a14615c7e7944e"
+  default     = null
 }
 
 variable "dlpod_instance_type" {

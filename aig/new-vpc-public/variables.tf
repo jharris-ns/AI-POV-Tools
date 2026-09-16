@@ -35,9 +35,9 @@ variable "allowed_cidr_blocks" {
 # ── EC2 ───────────────────────────────────────────────────────────────────────
 
 variable "aig_ami_id" {
-  description = "AMI ID for the Netskope AI Gateway appliance. Default is us-east-1; update for other regions."
+  description = "AMI ID for the Netskope AI Gateway appliance (prod-o7dybikxcj6oo). If null, the latest AMI is looked up from the built-in region map (us-east-2, us-west-1, us-west-2, eu-central-1, ap-southeast-1). Set explicitly for any other region."
   type        = string
-  default     = "ami-0a66805d7fb085df4"
+  default     = null
 }
 
 variable "instance_type" {

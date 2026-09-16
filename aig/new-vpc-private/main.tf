@@ -221,10 +221,26 @@ resource "aws_security_group" "aig" {
   tags = { Name = "${var.appliance_name}-sg" }
 }
 
+# ── AMI map ───────────────────────────────────────────────────────────────────
+# Latest AIG AMIs per region (prod-o7dybikxcj6oo). Override with var.aig_ami_id
+# for unlisted regions or to pin a specific version.
+
+locals {
+  aig_ami_map = {
+    us-east-2      = "ami-095a89b6ce06b54bd"
+    us-west-1      = "ami-01c878c21a7102259"
+    us-west-2      = "ami-0990c59991e339a7b"
+    eu-central-1   = "ami-03c6568be00277b45"
+    ap-southeast-1 = "ami-03b6ccdd1319fba2c"
+  }
+
+  aig_ami_id = coalesce(var.aig_ami_id, lookup(local.aig_ami_map, var.aws_region, null))
+}
+
 # ── EC2 Instance ──────────────────────────────────────────────────────────────
 
 resource "aws_instance" "aig" {
-  ami                    = var.aig_ami_id
+  ami                    = local.aig_ami_id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private.id
   private_ip             = var.aig_private_ip

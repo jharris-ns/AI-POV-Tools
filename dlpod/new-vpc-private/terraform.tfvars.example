@@ -1,0 +1,90 @@
+# Netskope DLP On-Demand (DLPoD) — new VPC, private subnet
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to terraform.tfvars and fill in the values marked REQUIRED.
+# All other values have working defaults and may be left as-is for most POVs.
+#
+# Full documentation: dlpod/new-vpc-private/README.md
+#
+# REMOTE STATE — to store Terraform state in S3 instead of locally:
+#   cp backend.hcl.example backend.hcl   # edit with your bucket details
+#   terraform init -backend-config=backend.hcl
+#   See docs/state-management.md for full instructions.
+
+# ── AWS region ────────────────────────────────────────────────────────────────
+# DLPoD 141 AMIs are built into the region map in main.tf for:
+#   us-east-2, us-west-1, us-west-2, eu-central-1, ap-southeast-1
+# For any other region, set dlpod_ami_id explicitly.
+
+aws_region        = "us-west-2"
+availability_zone = "us-west-2b"   # must be an AZ within aws_region
+
+# ── VPC and networking ────────────────────────────────────────────────────────
+# These CIDRs work for most POVs. Change them only if they overlap with
+# networks you need to peer or connect to this VPC.
+
+vpc_cidr            = "10.0.0.0/16"
+public_subnet_cidr  = "10.0.0.0/24"  # NAT Gateway only — no DLPoD instances here
+private_subnet_cidr = "10.0.1.0/24"  # DLPoD instance lives here
+
+# Fixed private IP for the DLPoD instance. Must be within private_subnet_cidr.
+# Set to null to let AWS assign from the subnet automatically.
+dlpod_private_ip = "10.0.1.10"
+
+# CIDRs allowed to reach the appliance on TCP port 443.
+# Restrict to your corporate network, VPN CIDR, or VPC CIDR.
+allowed_cidr_blocks = ["10.0.0.0/16"]
+
+# ── EC2 instance ──────────────────────────────────────────────────────────────
+
+# AMI ID for the DLPoD appliance. Auto-selected from the built-in region map
+# for supported regions. Override only if deploying to an unlisted region.
+# dlpod_ami_id = "ami-..."
+
+# EC2 instance type. Adjust based on expected DLP inspection throughput.
+instance_type = "m5.2xlarge"
+
+# EC2 key pair name for SSH access. Optional.
+# If omitted, attach AmazonSSMManagedInstanceCore to the instance IAM role
+# and use AWS Systems Manager Session Manager for console access.
+# key_name = "my-key-pair"
+
+# ── Appliance identity ────────────────────────────────────────────────────────
+
+# Name used as the Name tag prefix for all AWS resources.
+# Must start with "dlpod-" to match the deployment IAM policy conditions.
+appliance_name = "dlpod-pov"
+
+# ── Bootstrap: required ───────────────────────────────────────────────────────
+# These values are built into bootstrap.json and delivered via EC2 user-data.
+# nsbootstrap.service applies them at first boot before DLP pods are installed.
+
+# REQUIRED: appliance persona. One of: dlp-on-demand, dspm
+persona = "dlp-on-demand"
+
+# REQUIRED: Netskope license key for this appliance.
+# Mark this sensitive — do not commit to version control.
+licensekey = "REPLACE_WITH_LICENSE_KEY"
+
+# REQUIRED: primary DNS server reachable from the private subnet.
+# Use your VPC's DNS resolver (VPC CIDR +2, e.g. 10.0.0.2) or a corporate DNS.
+dns_primary = "10.0.0.2"
+
+# ── Bootstrap: optional ───────────────────────────────────────────────────────
+
+# Secondary DNS server. Leave empty to omit.
+# dns_secondary = "8.8.8.8"
+
+# Interface mode: true = DHCP (recommended for EC2), false = static.
+# On AWS EC2 leave this true — the hypervisor NIC is always DHCP-assigned.
+interface_dhcp = true
+
+# Required only when interface_dhcp = false:
+# static_ip      = "192.168.1.50"
+# static_gw      = "192.168.1.1"
+# static_netmask = "255.255.255.0"
+
+# Appliance hostname. Leave empty to let cloud-init set it (recommended for EC2).
+# system_hostname = "dlpod-pov.example.com"
+
+# IANA timezone. Leave empty to use the appliance default (UTC).
+# system_timezone = "America/Los_Angeles"

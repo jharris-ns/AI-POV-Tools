@@ -38,9 +38,10 @@ allowed_cidr_blocks = ["10.0.0.0/8"]
 
 # REQUIRED: AMI ID for the AIG appliance in your target region.
 # Subscribe to the Netskope AI Gateway on AWS Marketplace and accept the terms.
-# The AMI ID is region-specific and displayed after subscription.
-# The default below is for us-west-1.
-aig_ami_id = "ami-0a66805d7fb085df4"
+# Latest AIG AMIs (prod-o7dybikxcj6oo) are built into the region map in main.tf
+# for: us-east-2, us-west-1, us-west-2, eu-central-1, ap-southeast-1.
+# For any other region, set aig_ami_id explicitly.
+# aig_ami_id = "ami-..."
 
 # EC2 instance type. c6a.4xlarge is the recommended minimum (16 vCPU, 32 GB RAM).
 # Do not use a smaller instance type.

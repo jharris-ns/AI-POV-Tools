@@ -39,9 +39,10 @@ environment = "dev"
 
 # ── DLPoD EC2 ─────────────────────────────────────────────────────────────────
 
-# REQUIRED: DLPoD AMI ID for your region. Default is us-west-1.
-# Obtain region-specific AMI IDs from Netskope.
-dlpod_ami_id = "ami-0b3a14615c7e7944e"
+# DLPoD 141 AMIs are built into the region map in main.tf for:
+#   us-east-2, us-west-1, us-west-2, eu-central-1, ap-southeast-1
+# For any other region, set dlpod_ami_id explicitly.
+# dlpod_ami_id = "ami-..."
 
 # c5d.4xlarge has local NVMe SSD which speeds up nsbootstrap initialisation.
 dlpod_instance_type = "c5d.4xlarge"
