@@ -1,33 +1,5 @@
 # DevOps Reference
 
-## Architecture Overview
-
-```
-Internet
-    │
-    │ port 443
-    ▼
-┌─────────────────────────────────────────────────────────┐
-│  VPC (10.0.0.0/16)                                      │
-│                                                          │
-│  Public Subnet (10.0.1.0/24)                            │
-│  ┌──────────────┐   ┌────────────┐                      │
-│  │  AIG         │   │ NAT GW     │                      │
-│  │  (EIP)       │   │ (EIP)      │                      │
-│  └──────┬───────┘   └─────┬──────┘                      │
-│         │                 │                              │
-│  Private Subnet (10.0.2.0/24)                           │
-│  ┌──────────────┐   ┌────────────┐                      │
-│  │  Guardrails  │   │  DLPoD     │                      │
-│  │  GPU (.10)   │   │  (.20)     │                      │
-│  └──────────────┘   └────────────┘                      │
-└─────────────────────────────────────────────────────────┘
-```
-
-Traffic flow: Client → AIG (port 443) → Guardrails (port 8080) for LLM inspection, AIG → DLPoD (port 443) for DLP inspection.
-
----
-
 ## AWS Services Used
 
 ### EC2

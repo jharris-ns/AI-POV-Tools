@@ -196,7 +196,7 @@ variable "dlpod_ami_id" {
 variable "dlpod_instance_type" {
   description = "EC2 instance type for the DLPoD appliance"
   type        = string
-  default     = "m5.2xlarge"
+  default     = "c5d.4xlarge"
 }
 
 variable "dlpod_private_ip" {

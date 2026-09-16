@@ -1,6 +1,8 @@
 # Netskope AI Services — new VPC (AIG public + Guardrails private)
 # ─────────────────────────────────────────────────────────────────────────────
 # Copy this file to terraform.tfvars and fill in the values marked REQUIRED.
+# Required values: availability_zone, aig_ami_id, image_s3_bucket, dlpod_licensekey,
+#                  netskope credentials (env vars), and EC2 key pair names.
 # All other values have working defaults and may be left as-is for most POVs.
 #
 # Full documentation: README.md
@@ -54,9 +56,9 @@ aig_ami_id = "ami-0a66805d7fb085df4"
 # c6a.4xlarge (16 vCPU, 32 GB RAM) is the recommended minimum.
 aig_instance_type = "c6a.4xlarge"
 
-# EC2 key pair name for direct SSH to the AIG instance (optional).
-# Leave null to use SSM Session Manager only.
-# aig_key_name = "my-key-pair"
+# REQUIRED: EC2 key pair name for SSH access to the AIG instance.
+# Must already exist in the target region (aws ec2 describe-key-pairs --region YOUR_REGION).
+aig_key_name = "my-key-pair"
 
 # ── Guardrails — project ──────────────────────────────────────────────────────
 
@@ -75,9 +77,8 @@ volume_size_gb           = 100
 # Do not change this value after running terraform apply.
 guardrails_private_ip = "10.0.2.10"
 
-# EC2 key pair name for direct SSH to the Guardrails instance (optional).
-# Leave empty to use SSM Session Manager only (recommended).
-# guardrails_key_pair_name = "my-key-pair"
+# REQUIRED: EC2 key pair name for SSH access to the Guardrails instance.
+guardrails_key_pair_name = "my-key-pair"
 
 # ── Guardrails — image ────────────────────────────────────────────────────────
 # REQUIRED: Upload aisecurity-llm.tgz to this S3 bucket before running
@@ -103,6 +104,12 @@ dlpod_instance_type  = "c5d.4xlarge"
 dlpod_private_ip     = "10.0.2.20"
 dlpod_persona        = "dlp-on-demand"
 dlpod_hostname       = "dlp.aigw.internal"
+
+# REQUIRED: EC2 key pair name for SSH access to the DLPoD instance.
+dlpod_key_name = "my-key-pair"
+
+# REQUIRED: EC2 key pair name for SSH access to the bastion instance.
+bastion_key_name = "my-key-pair"
 
 # REQUIRED: Netskope license key for the DLPoD appliance.
 # Sensitive — use a gitignored tfvars file or TF_VAR_dlpod_licensekey env var.

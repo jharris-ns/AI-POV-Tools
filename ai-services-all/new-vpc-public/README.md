@@ -156,8 +156,14 @@ terraform apply
 | `aig_ami_id` | AMI ID for the AIG appliance in your region. Subscribe on AWS Marketplace and accept the terms. | `"ami-0a66805d7fb085df4"` |
 | `image_s3_bucket` | S3 bucket containing `aisecurity-llm.tgz`. Must exist and be accessible before `terraform apply`. | `"my-guardrails-bucket"` |
 | `dlpod_licensekey` | Netskope license key for the DLPoD appliance (sensitive — use `TF_VAR_dlpod_licensekey`) | — |
+| `netskope_server_url` | Netskope tenant API URL. Recommended: set via `NETSKOPE_SERVER_URL` env var (see [Environment variables](#environment-variables)). | `"https://tenant.goskope.com"` |
+| `netskope_api_key` | Netskope REST API v2 token (sensitive). Recommended: set via `NETSKOPE_API_KEY` env var. | — |
+| `aig_key_name` | EC2 key pair name for AIG SSH access | `"my-key-us-west-1"` |
+| `guardrails_key_pair_name` | EC2 key pair name for Guardrails SSH access | `"my-key-us-west-1"` |
+| `dlpod_key_name` | EC2 key pair name for DLPoD SSH access | `"my-key-us-west-1"` |
+| `bastion_key_name` | EC2 key pair name for bastion SSH access | `"my-key-us-west-1"` |
 
-### AWS and networking (optional)
+### AWS and networking
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -167,23 +173,20 @@ terraform apply
 | `private_subnet_cidr` | `"10.0.2.0/24"` | Private subnet — hosts Guardrails and DLPoD |
 | `allowed_cidr_blocks` | `["0.0.0.0/0"]` | CIDRs allowed to reach the AIG on TCP 443. Restrict to your corporate network for security. |
 
-### AIG — Netskope (optional)
+### AIG — Netskope
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `netskope_server_url` | `""` | Netskope tenant API URL. Prefer `NETSKOPE_SERVER_URL` env var. |
-| `netskope_api_key` | `""` | Netskope API v2 token (sensitive). Prefer `NETSKOPE_API_KEY` env var. |
 | `appliance_name` | `"aig-pov"` | AIG display name in Netskope tenant (1–15 characters) |
 | `secret_name` | `"aig/prod/bootstrap"` | Secrets Manager secret name. Must start with `aig/`. |
 
-### AIG — EC2 (optional)
+### AIG — EC2
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `aig_instance_type` | `"c6a.4xlarge"` | AIG EC2 instance type — 16 vCPU / 32 GB minimum |
-| `aig_key_name` | _(none)_ | EC2 key pair for AIG SSH access. Optional. |
 
-### Guardrails (optional)
+### Guardrails
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -192,21 +195,33 @@ terraform apply
 | `guardrails_instance_type` | `"g4dn.xlarge"` | GPU instance type. Use `g5.xlarge` for higher throughput. |
 | `volume_size_gb` | `100` | Root EBS volume size in GB (minimum 80) |
 | `guardrails_private_ip` | `"10.0.2.10"` | Fixed private IP — embedded in AIG bootstrap secret at plan time; do not change after apply |
-| `guardrails_key_pair_name` | `""` | EC2 key pair for Guardrails SSH access. Leave empty for SSM only. |
 | `image_s3_key` | `"aisecurity-llm.tgz"` | S3 object key for the Guardrails image tarball |
 
-### DLPoD (optional)
+### DLPoD
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `dlpod_appliance_name` | `"dlpod-pov"` | DLPoD Name tag prefix |
 | `dlpod_ami_id` | `"ami-0b3a14615c7e7944e"` | DLPoD AMI — default is us-west-1; update for other regions |
-| `dlpod_instance_type` | `"m5.2xlarge"` | DLPoD EC2 instance type. `c5d.4xlarge` recommended for faster bootstrap. |
+| `dlpod_instance_type` | `"c5d.4xlarge"` | DLPoD EC2 instance type |
 | `dlpod_private_ip` | `"10.0.2.20"` | Fixed private IP — embedded in AIG bootstrap secret at plan time; do not change after apply |
 | `dlpod_persona` | `"dlp-on-demand"` | DLPoD persona (`dlp-on-demand` or `dspm`) |
 | `dlpod_hostname` | `"dlp.aigw.internal"` | TLS hostname and Route 53 record name for DLPoD |
-| `dlpod_key_name` | _(none)_ | EC2 key pair for DLPoD SSH access. Optional. |
-| `bastion_key_name` | _(none)_ | EC2 key pair for bastion SSH access. Optional. |
+| `dlpod_ssh_public_key` | `""` | SSH public key injected into `nsadmin` via bootstrap. DLPoD does not use EC2 key injection — set this explicitly if you need SSH access. |
+
+---
+
+## Remote state
+
+Terraform state for this template contains TLS private keys (the DLPoD CA and leaf certificate) in plaintext. Use S3 remote state with encryption at rest.
+
+```bash
+cp backend.hcl.example backend.hcl
+# Edit backend.hcl — fill in your S3 bucket, region, and KMS key
+terraform init -backend-config=backend.hcl
+```
+
+See [docs/deployment.md](docs/deployment.md) for the full backend configuration and why encryption matters here.
 
 ---
 
@@ -298,9 +313,9 @@ dynamodb:GetItem / PutItem / DeleteItem   on your lock table (if using DynamoDB 
 
 ## Documentation
 
-| Doc | Audience |
+| Doc | Contents |
 |-----|----------|
-| [docs/deployment.md](docs/deployment.md) | Step-by-step deployment, all variables, remote state setup, teardown |
+| [docs/deployment.md](docs/deployment.md) | Remote state setup (S3 backend with KMS encryption) |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Diagnostic commands, common failure modes, rebuild procedures |
 | [docs/devops.md](docs/devops.md) | AWS service choices, bootstrap internals, AIG→DLPoD TLS validation, CI/CD integration |
 

@@ -17,13 +17,13 @@ All instances are accessible via SSM Session Manager — no SSH, no bastion requ
 
 ```bash
 # Guardrails
-aws ssm start-session --target $(terraform output -raw guardrails_instance_id) --region us-west-1
+aws ssm start-session --target $(terraform output -raw guardrails_instance_id) --region YOUR_REGION
 
 # Bastion (if deployed)
-aws ssm start-session --target $(terraform output -raw bastion_instance_id) --region us-west-1
+aws ssm start-session --target $(terraform output -raw bastion_instance_id) --region YOUR_REGION
 
 # AIG
-aws ssm start-session --target $(terraform output -raw aig_instance_id) --region us-west-1
+aws ssm start-session --target $(terraform output -raw aig_instance_id) --region YOUR_REGION
 ```
 
 ---
@@ -37,21 +37,21 @@ Use SSM Send Command for a quick non-interactive status check (no session needed
 ```bash
 # One-shot status snapshot
 CMDID=$(aws ssm send-command \
-  --region us-west-1 \
+  --region YOUR_REGION \
   --instance-ids $(terraform output -raw guardrails_instance_id) \
   --document-name AWS-RunShellScript \
-  --parameters 'commands=["echo === Phase1 ===; tail -3 /var/log/user-data.log 2>/dev/null; echo === Phase2 ===; tail -3 /var/log/guardrails-phase2.log 2>/dev/null; echo === Docker ===; docker ps 2>/dev/null | head -3 || echo no-docker; echo === SSM param ===; aws ssm get-parameter --name /guardrails-dev/guardrails-ready --region us-west-1 --query Parameter.Value --output text 2>/dev/null || echo not-set"]' \
+  --parameters 'commands=["echo === Phase1 ===; tail -3 /var/log/user-data.log 2>/dev/null; echo === Phase2 ===; tail -3 /var/log/guardrails-phase2.log 2>/dev/null; echo === Docker ===; docker ps 2>/dev/null | head -3 || echo no-docker; echo === SSM param ===; aws ssm get-parameter --name /guardrails-dev/guardrails-ready --region YOUR_REGION --query Parameter.Value --output text 2>/dev/null || echo not-set"]' \
   --query Command.CommandId --output text)
 sleep 12
 aws ssm get-command-invocation \
-  --region us-west-1 --command-id "$CMDID" \
+  --region YOUR_REGION --command-id "$CMDID" \
   --instance-id $(terraform output -raw guardrails_instance_id) \
   --query StandardOutputContent --output text
 ```
 
 For a live interactive tail, open a session:
 ```bash
-aws ssm start-session --target $(terraform output -raw guardrails_instance_id) --region us-west-1
+aws ssm start-session --target $(terraform output -raw guardrails_instance_id) --region YOUR_REGION
 sudo tail -f /var/log/user-data.log          # Phase 1
 sudo tail -f /var/log/guardrails-phase2.log  # Phase 2
 ```
@@ -66,13 +66,13 @@ sudo tail -f /var/log/guardrails-phase2.log  # Phase 2
 ```bash
 # Check what's holding the lock
 CMDID=$(aws ssm send-command \
-  --region us-west-1 \
+  --region YOUR_REGION \
   --instance-ids <instance-id> \
   --document-name AWS-RunShellScript \
   --parameters 'commands=["cloud-init status --long; ps aux | grep -E \"apt|dpkg\" | grep -v grep"]' \
   --query Command.CommandId --output text)
 sleep 12
-aws ssm get-command-invocation --region us-west-1 \
+aws ssm get-command-invocation --region YOUR_REGION \
   --command-id "$CMDID" --instance-id <instance-id> \
   --query StandardOutputContent --output text
 ```
@@ -113,7 +113,7 @@ If `terraform apply` passes the Guardrails readiness gate instantly on a fresh d
 ```bash
 aws ssm delete-parameter \
   --name "/guardrails-dev/guardrails-ready" \
-  --region us-west-1
+  --region YOUR_REGION
 terraform apply  # re-run; gate will now wait properly
 ```
 
@@ -162,7 +162,7 @@ curl -sk --max-time 5 https://10.0.2.20/ -w "%{http_code}"
 # With CA cert verification
 aws secretsmanager get-secret-value \
   --secret-id aig/prod/bootstrap \
-  --region us-west-1 \
+  --region YOUR_REGION \
   --query SecretString \
   --output text \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['dlp']['certificate'])" \
@@ -180,7 +180,7 @@ curl -s --cacert /tmp/dlpod-ca.pem https://10.0.2.20/ -w "%{http_code}"
 The AIG bootstrap runs at first boot. Check bootstrap logs on the AIG instance:
 
 ```bash
-aws ssm start-session --target <aig-instance-id> --region us-west-1
+aws ssm start-session --target <aig-instance-id> --region YOUR_REGION
 sudo journalctl -u aig-bootstrap -f
 # or
 sudo cat /var/log/aig-bootstrap.log
@@ -201,7 +201,7 @@ x509: certificate is valid for dlp.aigw.internal, not
 # Verify current secret content
 aws secretsmanager get-secret-value \
   --secret-id aig/prod/bootstrap \
-  --region us-west-1 \
+  --region YOUR_REGION \
   --query SecretString \
   --output text | python3 -m json.tool | grep '"host"'
 
@@ -210,12 +210,12 @@ aws secretsmanager get-secret-value \
 #   "host": "https://10.0.2.20"           ← wrong, rebuild needed
 ```
 
-To fix, taint and rebuild:
+To fix, rebuild:
 
 ```bash
-terraform taint aws_secretsmanager_secret_version.aig_bootstrap
-terraform taint aws_instance.aig
-terraform apply
+terraform apply \
+  -replace=aws_secretsmanager_secret_version.aig_bootstrap \
+  -replace=aws_instance.aig
 ```
 
 ### Enrollment token expired or consumed
@@ -223,10 +223,10 @@ terraform apply
 Enrollment tokens are single-use and expire after 24 hours. If the AIG fails to enroll after a long delay:
 
 ```bash
-terraform taint netskope_aig_appliance_enrollment_token.this
-terraform taint aws_secretsmanager_secret_version.aig_bootstrap
-terraform taint aws_instance.aig
-terraform apply
+terraform apply \
+  -replace=netskope_aig_appliance_enrollment_token.this \
+  -replace=aws_secretsmanager_secret_version.aig_bootstrap \
+  -replace=aws_instance.aig
 ```
 
 ---
@@ -261,7 +261,7 @@ Terraform refreshes state against AWS on each run, so resources already deleted 
 ```bash
 aws ec2 describe-network-interfaces \
   --filters "Name=subnet-id,Values=<subnet-id>" \
-  --region us-west-1 \
+  --region YOUR_REGION \
   --query 'NetworkInterfaces[*].{ID:NetworkInterfaceId,Desc:Description,Status:Status}' \
   --output table
 ```
@@ -275,10 +275,10 @@ ENIs with descriptions like `VPC Endpoint Interface vpce-xxx` are the endpoint E
 ### Rebuild AIG only (same appliance, new token)
 
 ```bash
-terraform taint netskope_aig_appliance_enrollment_token.this
-terraform taint aws_secretsmanager_secret_version.aig_bootstrap
-terraform taint aws_instance.aig
-terraform apply
+terraform apply \
+  -replace=netskope_aig_appliance_enrollment_token.this \
+  -replace=aws_secretsmanager_secret_version.aig_bootstrap \
+  -replace=aws_instance.aig
 ```
 
 ### Full AIG re-registration (new appliance record)
@@ -286,19 +286,19 @@ terraform apply
 Use when the appliance record in the Netskope tenant is stale or deleted:
 
 ```bash
-terraform taint netskope_aig_appliance.this
-terraform taint netskope_aig_appliance_enrollment_token.this
-terraform taint aws_secretsmanager_secret_version.aig_bootstrap
-terraform taint aws_instance.aig
-terraform apply
+terraform apply \
+  -replace=netskope_aig_appliance.this \
+  -replace=netskope_aig_appliance_enrollment_token.this \
+  -replace=aws_secretsmanager_secret_version.aig_bootstrap \
+  -replace=aws_instance.aig
 ```
 
 ### Rebuild Guardrails
 
 ```bash
-terraform taint aws_instance.guardrails
-terraform taint null_resource.guardrails_ready  # re-run readiness gate
-terraform apply
+terraform apply \
+  -replace=aws_instance.guardrails \
+  -replace=null_resource.guardrails_ready
 # This will also recreate null_resource.dlpod_ready and aws_instance.aig
 # (because AIG depends on both readiness gates)
 ```
@@ -306,8 +306,8 @@ terraform apply
 ### Rebuild DLPoD
 
 ```bash
-terraform taint aws_instance.dlpod
-terraform taint null_resource.dlpod_ready
-terraform apply
+terraform apply \
+  -replace=aws_instance.dlpod \
+  -replace=null_resource.dlpod_ready
 # AIG will also be recreated (depends on dlpod_ready)
 ```
