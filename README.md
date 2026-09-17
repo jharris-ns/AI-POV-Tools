@@ -20,15 +20,15 @@ Deploys the complete Netskope AI Services stack — AI Gateway, AI Guardrails GP
 
 ### AI Gateway (AIG)
 
-The AI Gateway inspects and controls AI traffic, providing visibility and policy enforcement for generative AI tools such as ChatGPT, Copilot, and custom LLM applications.
+Deploys the AI Gateway only
 
 Three deployment options are provided, covering the most common network topologies encountered in POVs:
 
-| Option | Directory | Best for |
-|--------|-----------|---------|
-| [Existing VPC](aig/existing-vpc/README.md) | `aig/existing-vpc/` | You already have a VPC and subnet in AWS |
-| [New VPC — public subnet](aig/new-vpc-public/README.md) | `aig/new-vpc-public/` | Fastest setup; gateway directly reachable from the internet |
-| [New VPC — private subnet](aig/new-vpc-private/README.md) | `aig/new-vpc-private/` | Production-like; no inbound internet exposure, outbound via NAT |
+| Option | Directory | Best for                                                                                   |
+|--------|-----------|--------------------------------------------------------------------------------------------|
+| [Existing VPC](aig/existing-vpc/README.md) | `aig/existing-vpc/` | You already have a VPC and subnet in AWS and perhaps already deployed guardrails and DLPoD |
+| [New VPC — public subnet](aig/new-vpc-public/README.md) | `aig/new-vpc-public/` | Fastest setup; gateway directly reachable from the internet                                |
+| [New VPC — private subnet](aig/new-vpc-private/README.md) | `aig/new-vpc-private/` | Production-like; no inbound internet exposure, outbound via NAT                            |
 
 The gateway self-enrolls at first boot using an enrollment token stored in AWS Secrets Manager — no interactive steps required after `terraform apply`.
 
@@ -38,7 +38,7 @@ The gateway self-enrolls at first boot using an enrollment token stored in AWS S
 
 ### AI Guardrails — GPU
 
-AI Guardrails runs an NVIDIA GPU-backed LLM service that the AIG appliance uses for inline AI content inspection. This module deploys the Guardrails Docker container on an Ubuntu 22.04 EC2 GPU instance.
+Deploys the Guardrails Docker container on an Ubuntu 22.04 EC2 GPU instance.
 
 | Option | Directory | Best for |
 |--------|-----------|---------|
@@ -53,7 +53,7 @@ Setup is automated via a two-phase UserData script — NVIDIA drivers are instal
 
 ### DLP On-Demand (DLPoD)
 
-DLPoD provides cloud-delivered data loss prevention inspection. The appliance is zero-touch provisioned via EC2 user-data — no SSH or manual console steps are required.
+Deploys DLPoD provides cloud-delivered data loss prevention inspection. The appliance is zero-touch provisioned via EC2 user-data — no SSH or manual console steps are required.
 
 | Option | Directory | Best for |
 |--------|-----------|---------|
