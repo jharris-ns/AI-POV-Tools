@@ -143,7 +143,7 @@ Stage 3: aig/existing-vpc/                →  in:  guardrails_host, dlp_host, d
 
 The AIG goes last because it reads its bootstrap secret once at first boot, and that secret must already contain `dlp_host` and the CA certificate this template generates.
 
-See [ai-services-all/README.md](../../ai-services-all/README.md#staged-build-deploying-components-in-order) for the full workflow.
+See [ai-services-all/README.md](../../STAGED-BUILD.md) for the full workflow.
 
 ---
 

@@ -153,7 +153,7 @@ vpc_id               = "vpc-0abc123..."
 
 ### Staged build
 
-If the combined `ai-services-all/new-vpc-public/` stack (recommended) is not wanted and the components are to be deployed one at a time, this template is **Stage 1**: it creates the VPC, and `dlpod/existing-vpc/` (Stage 2) and `aig/existing-vpc/` (Stage 3) join it using the outputs above. The AIG must be last because its bootstrap secret, read once at first boot, needs `ai_guardrails_host` from this stage and `dlp_host` + `ca_cert_pem` from Stage 2. Full walkthrough: [`ai-services-all/README.md`](../../ai-services-all/README.md#staged-build-deploying-components-in-order).
+If the combined `ai-services-all/new-vpc-public/` stack (recommended) is not wanted and the components are to be deployed one at a time, this template is **Stage 1**: it creates the VPC, and `dlpod/existing-vpc/` (Stage 2) and `aig/existing-vpc/` (Stage 3) join it using the outputs above. The AIG must be last because its bootstrap secret, read once at first boot, needs `ai_guardrails_host` from this stage and `dlp_host` + `ca_cert_pem` from Stage 2. Full walkthrough: [`ai-services-all/README.md`](../../STAGED-BUILD.md).
 
 ---
 

@@ -2,7 +2,7 @@
 
 Deploys a Netskope DLP On-Demand (DLPoD) appliance into a **brand-new AWS VPC** with the appliance in a **private subnet**. Outbound internet access is provided by a NAT Gateway — the appliance has no inbound exposure from the internet. DLPoD is zero-touch provisioned via EC2 user-data — no SSH or manual console steps are required.
 
-Use this template as **Stage 1** of a staged build (it creates the VPC the other templates join) when you deploy the AIG separately. The `dlp_host` and `ca_cert_pem` outputs feed directly into the AIG bootstrap secret. See [staged build workflow](../../ai-services-all/README.md#staged-build-deploying-components-in-order).
+Use this template as **Stage 1** of a staged build (it creates the VPC the other templates join) when you deploy the AIG separately. The `dlp_host` and `ca_cert_pem` outputs feed directly into the AIG bootstrap secret. See [staged build workflow](../../STAGED-BUILD.md).
 
 ---
 
@@ -161,7 +161,7 @@ Stage 3: aig/existing-vpc/                →  in: vpc_id, subnet_id, guardrails
 
 A staged build is itself the fallback to the combined `ai-services-all/new-vpc-public/` stack. Within a staged build, the preferred Stage 1 is `gpu-guardrails/new-vpc-private/` with `dlpod/existing-vpc/` as Stage 2, because `dlpod/existing-vpc/` creates the Route 53 private zone the AIG needs to reach DLPoD by hostname. This template does not create DNS — if you start here, set `system_hostname` and provide resolution for it in the VPC yourself.
 
-See [ai-services-all/README.md](../../ai-services-all/README.md#staged-build-deploying-components-in-order) for the full workflow.
+See [ai-services-all/README.md](../../STAGED-BUILD.md) for the full workflow.
 
 ---
 

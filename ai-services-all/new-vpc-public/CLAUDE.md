@@ -64,12 +64,12 @@ aws s3 cp aisecurity-llm.tgz s3://YOUR_BUCKET_NAME/aisecurity-llm.tgz
 ```
 The bucket name goes into `image_s3_bucket` in `terraform.tfvars`. The bucket must be in the **same region** as `aws_region`.
 
-### 7. EC2 key pairs
-The template requires key pair names for AIG, Guardrails, DLPoD, and Bastion. All key pairs must already exist in the target region:
+### 7. EC2 key pairs (optional)
+All four instances are reachable via SSM Session Manager; key pairs are **not required**. Only if the user wants SSH as well, the named key pairs must already exist in the target region:
 ```bash
 aws ec2 describe-key-pairs --region YOUR_REGION --query 'KeyPairs[*].KeyName'
 ```
-The same key pair name can be used for all four instances if desired.
+Do not tell users key pairs are mandatory — `variables.tf` defaults them to null/empty.
 
 ### 8. Netskope credentials
 Set these as environment variables — **do not put them in `terraform.tfvars`** (they would appear in state):
@@ -103,12 +103,8 @@ Edit `terraform.tfvars` and fill in all **REQUIRED** values:
 | `aig_ami_id` | From AWS Marketplace after accepting AIG terms |
 | `dlpod_ami_id` | From Netskope — region-specific |
 | `image_s3_bucket` | S3 bucket where `aisecurity-llm.tgz` was uploaded |
-| `aig_key_name` | EC2 key pair name in target region |
-| `guardrails_key_pair_name` | EC2 key pair name in target region |
-| `dlpod_key_name` | EC2 key pair name in target region |
-| `bastion_key_name` | EC2 key pair name in target region |
 
-All other variables have working defaults and can be left as-is for a standard POV.
+`dlpod_ami_id` has a default that is valid only in us-west-1; everywhere else it must be set. The four `*_key_name` variables are optional. All other variables have working defaults and can be left as-is for a standard POV.
 
 ---
 

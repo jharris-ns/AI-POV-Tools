@@ -8,13 +8,13 @@ Diagnose systematically. Collect facts before proposing fixes.
 2. Pull the relevant guide and follow it before improvising:
    - AIG: `aig/docs/troubleshooting.md`
    - Combined stack, Guardrails, DLPoD, bastion: `ai-services-all/new-vpc-public/docs/troubleshooting.md`
-   - DLPoD bootstrap behaviour and log locations: `dlpod/README.md` §"Verifying bootstrap" and §"Known issues"
+   - DLPoD bootstrap behaviour and log locations: `dlpod/docs/ztp-bootstrap-reference.md` §"Verifying bootstrap" and §"Known issues"
 3. Gather evidence (ask the user to run these and paste results, redacting anything sensitive):
    - `terraform output`
    - `aws ec2 describe-instance-status --instance-ids <id>`
    - For Guardrails: via `ssm_connect_command`, `tail -n 50 /var/log/user-data.log` and `/var/log/guardrails-phase2.log`
    - For AIG: appliance status in the Netskope tenant, or `GET /api/v2/aig/appliances` (header `Netskope-Api-Token`); `connected` means healthy
-   - For DLPoD: the bootstrap status/log commands in `dlpod/README.md`
+   - For DLPoD: the bootstrap status/log commands in `dlpod/README.md` §Checking it worked
 4. Common causes to check first:
    - Enrollment token older than 24 h → `terraform apply` again
    - Wrong-region AMI ID → the example IDs are not universal
