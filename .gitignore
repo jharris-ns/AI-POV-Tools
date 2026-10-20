@@ -24,3 +24,9 @@ venv/
 
 # Internal docs at project root (PDFs and reference documents — not for distribution)
 /docs/
+
+# Claude Code local permission overrides (machine-specific; pre-approve apply/destroy)
+.claude/settings.local.json
+
+# Curated customer packages
+/dist/
