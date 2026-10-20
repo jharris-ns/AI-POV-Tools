@@ -78,7 +78,7 @@ Its outputs `vpc_id`, `private_subnet_id`, `vpc_cidr`, `private_subnet_cidr`
 exist for exactly this hand-off. The AIG goes last because its bootstrap
 secret (read once at first boot) must already contain `ai_guardrails_host`
 and the DLPoD `dlp_host` + CA cert. Walkthrough with the variable mapping:
-`ai-services-all/README.md` §Staged build.
+`STAGED-BUILD.md`.
 
 ## Common requests
 

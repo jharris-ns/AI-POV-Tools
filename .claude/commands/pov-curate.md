@@ -50,4 +50,4 @@ Read `dist/<name>-<date>/MANIFEST.md` back to the SE:
 
 Finish with a reminder: the customer still has to obtain their own AIG AMI ID, DLPoD AMI ID, license key, and Netskope API token — the package contains none of them.
 
-Never copy anything from `/docs/` at the repo root into the package by hand; it is internal.
+Never copy anything from `/internal/` at the repo root into the package by hand.

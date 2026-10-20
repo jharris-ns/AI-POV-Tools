@@ -158,7 +158,8 @@ if [[ $HAS_GR -eq 1 ]]; then
   [[ -f gpu-guardrails/CLAUDE.md ]] && { cp gpu-guardrails/CLAUDE.md "$PKG/gpu-guardrails/"; note "gpu-guardrails/CLAUDE.md"; }
 fi
 if [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]]; then
-  mkdir -p "$PKG/dlpod"; cp dlpod/README.md "$PKG/dlpod/"; note "dlpod/README.md"
+  mkdir -p "$PKG/dlpod/docs"; cp dlpod/README.md "$PKG/dlpod/"; note "dlpod/README.md"
+  cp dlpod/docs/ztp-bootstrap-reference.md "$PKG/dlpod/docs/"; note "dlpod/docs/ztp-bootstrap-reference.md"
   [[ $HAS_DLP -eq 1 && -f dlpod/CLAUDE.md ]] && { cp dlpod/CLAUDE.md "$PKG/dlpod/"; note "dlpod/CLAUDE.md"; }
 fi
 if [[ $HAS_ALL -eq 1 ]]; then
@@ -168,7 +169,7 @@ elif [[ $HAS_GR -eq 1 || $HAS_DLP -eq 1 ]]; then
   # The combined-stack troubleshooting guide is the only Guardrails/DLPoD diagnostic doc.
   mkdir -p "$PKG/ai-services-all/new-vpc-public/docs"
   cp ai-services-all/new-vpc-public/docs/troubleshooting.md "$PKG/ai-services-all/new-vpc-public/docs/"; note "ai-services-all/new-vpc-public/docs/troubleshooting.md"
-  if (( HAS_AIG + HAS_GR + HAS_DLP > 1 )); then copy ai-services-all/README.md; note "ai-services-all/README.md (staged build workflow)"; fi
+  if (( HAS_AIG + HAS_GR + HAS_DLP > 1 )); then cp STAGED-BUILD.md "$PKG/"; note "STAGED-BUILD.md"; fi
 fi
 
 # Drop the comment-only top-level main.tf redirects if their parent was copied
@@ -218,7 +219,7 @@ done
     echo '```'
     echo
     echo "The AIG goes last: it reads its bootstrap secret once at first boot, and the secret must already contain the Guardrails endpoint and the DLPoD endpoint + CA certificate. Those only exist after the earlier stages."
-    [[ -f "$PKG/ai-services-all/README.md" ]] && echo "Variable-by-variable mapping: \`ai-services-all/README.md\` §Staged build."
+    [[ -f "$PKG/STAGED-BUILD.md" ]] && echo "Variable-by-variable mapping: \`STAGED-BUILD.md\`."
   fi
   echo
   echo "## You will need to supply"
@@ -270,7 +271,7 @@ note "README.md (generated)"
   echo "| Not enrolling / not healthy / timed out | \`/pov-troubleshoot\`; \`aig/docs/troubleshooting.md\` if present |"
   echo "| Remove everything | \`/pov-teardown\` |"
   [[ $HAS_AIG -eq 1 || $HAS_ALL -eq 1 ]] && echo "| Deployer IAM permissions | \`aig/docs/iam-permissions.md\` |"
-  [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]] && echo "| bootstrap.json schema | \`dlpod/README.md\` |"
+  [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]] && echo "| bootstrap.json schema | \`dlpod/docs/ztp-bootstrap-reference.md\` |"
   echo
   echo "## Constraints"
   echo
@@ -357,7 +358,7 @@ grep -rnE '\bami-[0-9a-f]{8,17}\b' "$PKG" --include='*.tf' 2>/dev/null | sed "s|
   echo
   echo "## Always excluded"
   echo
-  echo '`/docs/` (internal), `*.tfstate*`, `*.tfvars`, `tfplan*`, `.terraform/`, `.terraform.lock.hcl`, `backend.hcl`, `.claude/settings.local.json`, `.idea/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `test-results*.json`, `.DS_Store`, `scripts/curate.sh`, `/pov-curate`'
+  echo '`/internal/`, `*.tfstate*`, `*.tfvars`, `tfplan*`, `.terraform/`, `.terraform.lock.hcl`, `backend.hcl`, `.claude/settings.local.json`, `.idea/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `test-results*.json`, `.DS_Store`, `scripts/curate.sh`, `/pov-curate`'
   echo
   echo "## Secret scan"
   echo

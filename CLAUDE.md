@@ -21,6 +21,7 @@ If you cannot tell which you are talking to, ask.
 AI-POV-Tools/
   CLAUDE.md                      # This file — router and global rules
   HELP.md                        # Human-facing "I want to…" index, FAQ, glossary
+  STAGED-BUILD.md                # One-component-at-a-time deployment order (fallback)
   README.md                      # Project overview and module navigation
   .claude/commands/              # Slash commands: /pov-preflight, /pov-deploy,
                                  #   /pov-troubleshoot, /pov-teardown, /pov-curate
@@ -40,9 +41,10 @@ AI-POV-Tools/
     existing-vpc/  new-vpc-private/
   dlpod/                         # DLP On-Demand
     CLAUDE.md
-    README.md                    # bootstrap.json (ZTP) schema reference
+    README.md                    # DLPoD overview and template choice
+    docs/                        # ztp-bootstrap-reference.md (bootstrap.json schema)
     existing-vpc/  new-vpc-private/
-  docs/                          # INTERNAL — gitignored, never shipped to customers
+  internal/                      # INTERNAL — gitignored, never shipped to customers
   dist/                          # Curated customer packages — gitignored
 ```
 
@@ -99,8 +101,7 @@ Stage 3: aig/existing-vpc/                →  in: vpc_id, subnet_id, appliance_
 The AIG is last because its bootstrap secret is read once at first boot and
 must already contain the Guardrails endpoint and the DLPoD endpoint + CA
 cert, which only exist after Stages 1–2. The canonical walkthrough with
-the variable-by-variable mapping is `ai-services-all/README.md` §Staged
-build. A staged build cannot produce an internet-reachable AIG; use the
+the variable-by-variable mapping is `STAGED-BUILD.md`. A staged build cannot produce an internet-reachable AIG; use the
 combined stack for that.
 
 ---
@@ -176,13 +177,13 @@ Collect all of these before running the script:
 - The selected Terraform roots with their `README.md` and `terraform.tfvars.example`
 - `aig/deployment-role/` whenever any AIG root is selected
 - `aig/docs/iam-permissions.md` and `aig/docs/troubleshooting.md` whenever any AIG root is selected
-- `dlpod/README.md` (ZTP schema reference) whenever any DLPoD root is selected
+- `dlpod/README.md` and `dlpod/docs/ztp-bootstrap-reference.md` whenever any DLPoD root is selected
 - `scripts/preflight.sh` and the `/pov-preflight`, `/pov-deploy`,
   `/pov-troubleshoot`, `/pov-teardown` commands
 
 ### What is never included
 
-- `/docs/` at the repo root (internal PDFs, CA PEM, IAM policy JSON source)
+- `/internal/` at the repo root (PDFs, CA PEM, IAM policy JSON source)
 - `*.tfstate*`, `*.tfvars`, `tfplan*`, `.terraform/`, `.terraform.lock.hcl`
 - `.claude/settings.local.json` (pre-approves apply/destroy for the SE's machine)
 - `.idea/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `test-results*.json`, `.DS_Store`
@@ -212,7 +213,7 @@ Collect all of these before running the script:
 | "What permissions does the deployer need?" | `aig/docs/iam-permissions.md` |
 | "How do I remove everything?" | `/pov-teardown` |
 | "Build a package for customer X" | `/pov-curate` (SEs only) |
-| "What does bootstrap.json look like?" | `dlpod/README.md` |
+| "What does bootstrap.json look like?" | `dlpod/docs/ztp-bootstrap-reference.md` |
 | "How do I store state safely?" | `aig/docs/state-management.md`; `ai-services-all/new-vpc-public/docs/deployment.md` |
 
 ---

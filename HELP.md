@@ -1,22 +1,19 @@
 # Help — Netskope POV Deployment Toolkit
 
 Start here if you have never used this repository. It answers "I want to…"
-questions and points you to the right guide. For the module overview see
-[`README.md`](README.md).
+questions in plain language and points you to the right guide. For the
+module overview see [`README.md`](README.md).
 
-If you use **Claude Code**, open this folder and ask it anything. It reads
-`CLAUDE.md` for context and offers these commands:
+**If you only read one line:** for a full POV, use
+[`ai-services-all/new-vpc-public/`](ai-services-all/new-vpc-public/README.md).
+It installs the AI Gateway, AI Guardrails and DLP On-Demand together with one
+command and wires them to each other.
 
-| Command | What it does |
-|---------|--------------|
-| `/pov-preflight` | Checks Terraform, AWS credentials, quotas, key pairs and env vars for the template you chose |
-| `/pov-deploy` | Walks you through tfvars, `init`, `plan`, `apply`, outputs and verification |
-| `/pov-troubleshoot` | Systematic diagnosis of a failed or unhealthy deployment |
-| `/pov-teardown` | Safe `terraform destroy` with the right ordering and reminders |
-| `/pov-curate` | *Netskope SEs only* — builds a customer-specific package |
-
-Without Claude Code, `scripts/preflight.sh <template-dir>` runs the same
-readiness checks from the shell.
+*What is a "template"?* A folder you `cd` into and run three commands in:
+`terraform init`, `terraform plan`, `terraform apply`. Each template is
+independent and has its own README. You only ever run Terraform inside one of
+the sub-folders named `existing-vpc/`, `new-vpc-public/` or `new-vpc-private/`
+— never at the top of `aig/`, `dlpod/` or `gpu-guardrails/`.
 
 ---
 
@@ -24,72 +21,103 @@ readiness checks from the shell.
 
 ### …figure out which template to use
 
+Answer these three questions in order.
+
+**1. Do you want all three components (AI Gateway + Guardrails + DLPoD)?**
+
+- **Yes** → `ai-services-all/new-vpc-public/`. You're done — skip to
+  […check I have everything](#check-i-have-everything-before-i-start).
+- **Just one** → go to question 2.
+- **All three, but the customer insists on installing them one at a time** →
+  skip to […deploy one component at a time](#deploy-the-three-components-one-at-a-time-only-if-the-combined-template-is-refused).
+
+**2. Which component?**
+
+| Component | What it proves in a POV | Folder |
+|-----------|-------------------------|--------|
+| AI Gateway (AIG) | AI traffic is proxied and policy is applied | `aig/` |
+| AI Guardrails | LLM prompts and responses are inspected | `gpu-guardrails/` |
+| DLP On-Demand (DLPoD) | Sensitive data in AI traffic is detected | `dlpod/` |
+
+Guardrails and DLPoD are back-end services that the AIG calls. On their own
+they prove very little — an AIG is almost always part of the picture.
+
+**3. Does the customer already have an AWS VPC and subnet to use?**
+
+- **Yes** → the component's `existing-vpc/` sub-folder.
+- **No** → a `new-vpc-…` sub-folder:
+  - For the **AIG**, decide whether people outside AWS must reach it directly.
+    Yes → `aig/new-vpc-public/`. No → `aig/new-vpc-private/` (more realistic,
+    and the better default).
+  - **Guardrails** and **DLPoD** only have `new-vpc-private/`. They are never
+    exposed to the internet.
+
+The same decision as a picture:
+
 ```
-Which components?
-├── AIG + Guardrails + DLPoD → ai-services-all/new-vpc-public/   ← recommended
-│     One apply, one state, DNS/TLS between components wired for you.
-└── One component only, or you specifically want one-at-a-time → pick the component:
-      AIG        → aig/            (existing-vpc | new-vpc-public | new-vpc-private)
-      Guardrails → gpu-guardrails/ (existing-vpc | new-vpc-private)
-      DLPoD      → dlpod/          (existing-vpc | new-vpc-private)
-
-Existing VPC and subnet?  → existing-vpc/
-New VPC, AIG must be reachable from the internet? → aig/new-vpc-public/
-New VPC, private only → new-vpc-private/   (recommended for a realistic POV)
+All three components? ── yes ──► ai-services-all/new-vpc-public/
+        │
+        no
+        ▼
+Which one?
+  ├─ AIG ────────────► existing VPC? ── yes ──► aig/existing-vpc/
+  │                                   └─ no ───► internet-facing? ── yes ──► aig/new-vpc-public/
+  │                                                                └─ no ───► aig/new-vpc-private/
+  ├─ Guardrails ─────► existing VPC? ── yes ──► gpu-guardrails/existing-vpc/
+  │                                   └─ no ───► gpu-guardrails/new-vpc-private/
+  └─ DLPoD ──────────► existing VPC? ── yes ──► dlpod/existing-vpc/
+                                      └─ no ───► dlpod/new-vpc-private/
 ```
 
-Guardrails and DLPoD never get a public option — they are back-end services
-the AIG talks to privately.
-
-Each module README has the same decision tree with more detail:
+Each module README repeats its own part of this tree with more detail:
 [`aig/README.md`](aig/README.md) ·
 [`gpu-guardrails/README.md`](gpu-guardrails/README.md) ·
 [`dlpod/README.md`](dlpod/README.md) ·
 [`ai-services-all/README.md`](ai-services-all/README.md)
 
-### …deploy the components one at a time (staged build)
+### …deploy the three components one at a time (only if the combined template is refused)
 
-The **recommended** way to get all three appliances is the combined
-[`ai-services-all/new-vpc-public/`](ai-services-all/new-vpc-public/README.md)
-stack: one apply, one state, and the DNS/TLS wiring between them is done for
-you. Use the staged build below only if you do not want the combined stack
-and prefer to deploy each appliance as its own Terraform run. Keep all three
-in one VPC: Stage 1 creates it, Stages 2–3 join it.
+**Why the order matters.** The AI Gateway configures itself **once, when it
+first boots**, from a secret that must already contain the Guardrails address
+and the DLPoD address plus its certificate. Those don't exist until Guardrails
+and DLPoD are running. So the order is fixed and the AIG is always last.
 
 ```
-Stage 1: gpu-guardrails/new-vpc-private/  creates the VPC; outputs vpc_id, private_subnet_id,
-                                          vpc_cidr, private_subnet_cidr, ai_guardrails_host
-Stage 2: dlpod/existing-vpc/              joins it; outputs dlp_host, ca_cert_pem
-Stage 3: aig/existing-vpc/                joins it; takes guardrails_host, dlp_host, dlp_ca_cert_pem
+1. gpu-guardrails/new-vpc-private/   creates the VPC and installs Guardrails  (wait until "Healthy" — ~30 min)
+2. dlpod/existing-vpc/               joins that VPC and installs DLPoD
+3. aig/existing-vpc/                 joins that VPC and installs the AIG
 ```
 
-The AIG must be last: it reads its bootstrap secret once at first boot, and
-that secret has to contain the Guardrails and DLPoD endpoints plus the DLPoD
-CA certificate — none of which exist until Stages 1 and 2 have run.
-Variable-by-variable instructions:
-[`ai-services-all/README.md`](ai-services-all/README.md) §Staged build.
+After each stage, `terraform output` prints values you copy into the next
+stage's `terraform.tfvars`. The exact copy-from / paste-to list is in
+[`STAGED-BUILD.md`](STAGED-BUILD.md).
+
+Expect three separate state files and roughly twice the hands-on time of the
+combined template. A staged build cannot give you an internet-facing AIG; if
+the customer needs that, the combined template is the only option.
 
 ### …check I have everything before I start
 
-Run `scripts/preflight.sh <template-dir>` or `/pov-preflight`. It checks
-the items below and tells you which README section fixes each failure.
+You don't need to understand this table — run `scripts/preflight.sh <folder>`
+(or `/pov-preflight` in Claude Code) and it checks every line and tells you
+what to fix.
 
 | Need | Templates | Where to get it |
 |------|-----------|-----------------|
 | Terraform ≥ 1.5 | all | [terraform.io/install](https://developer.hashicorp.com/terraform/install) |
-| AWS CLI profile | all | [AWS CLI quickstart](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html) |
+| AWS CLI signed in to the right account | all | [AWS CLI quickstart](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html) |
 | EC2 key pair(s) in the region | all | `aws ec2 describe-key-pairs --region …` |
 | Netskope REST API v2 token + tenant URL | AIG, combined | Tenant → Settings → Tools → REST API v2 |
-| AIG AMI ID | AIG, combined | AWS Marketplace → Netskope AI Gateway → accept terms; region-specific |
-| DLPoD AMI ID | DLPoD, combined | From Netskope; region-specific. Templates include a lookup map for some regions |
+| AIG AMI ID | AIG, combined | AWS Marketplace → Netskope AI Gateway → accept terms; different per region |
+| DLPoD AMI ID | DLPoD, combined | From Netskope; different per region. Templates include a lookup for some regions |
 | DLPoD license key | DLPoD, combined | From Netskope |
-| `aisecurity-llm.tgz` in an S3 bucket in the region | Guardrails, combined | From Netskope; `aws s3 cp` it before apply |
+| `aisecurity-llm.tgz` uploaded to an S3 bucket in the region | Guardrails, combined | From Netskope; `aws s3 cp` it before you start |
 | EC2 quota "Running On-Demand G and VT instances" ≥ 4 vCPU | Guardrails, combined | AWS Console → Service Quotas → EC2 |
-| Deployment IAM role applied | AIG | `aig/deployment-role/`, once per account |
+| Deployment IAM role applied | AIG | `aig/deployment-role/`, once per AWS account |
 
 ### …set my credentials safely
 
-Environment variables, never files:
+Put secrets in environment variables, never in files:
 
 ```bash
 export NETSKOPE_SERVER_URL="https://<tenant>.goskope.com/api/v2"
@@ -97,17 +125,21 @@ export NETSKOPE_API_KEY="<rest-api-v2-token>"
 export TF_VAR_dlpod_licensekey="<license>"   # any template that deploys DLPoD
 ```
 
-`terraform.tfvars` is gitignored, but anything in it ends up in
-`terraform.tfstate`. State already holds TLS private keys, so treat it as a
-secret and consider remote encrypted state:
+Why: anything you type into `terraform.tfvars` is copied into
+`terraform.tfstate`, and that file is easy to share by accident. State already
+holds TLS private keys, so treat it as a secret. For anything that will live
+more than a few days, store state in S3 with encryption:
 [`aig/docs/state-management.md`](aig/docs/state-management.md).
 
 ### …deploy
 
-1. `cd` into the template directory (never a module's top level).
-2. `cp terraform.tfvars.example terraform.tfvars` and fill in the REQUIRED
-   values listed in that directory's README.
-3. `terraform init`, `terraform plan`, `terraform apply`.
+1. `cd` into the template folder (one of the `existing-vpc/` / `new-vpc-…/` sub-folders).
+2. `cp terraform.tfvars.example terraform.tfvars`, then open `terraform.tfvars`
+   and fill in the values marked REQUIRED. The folder's README has a table
+   saying where each one comes from.
+3. `terraform init` (downloads what Terraform needs — once per folder).
+4. `terraform plan` — shows what *will* happen. Nothing is created.
+5. `terraform apply` — does it. Nothing is created until you type `yes`.
 
 How long it takes:
 
@@ -116,7 +148,7 @@ How long it takes:
 | AIG | 3–5 min | allow up to 15 min for boot and self-enrollment |
 | Guardrails | ~2 min | 15–35 min later (two-phase boot with a reboot) |
 | DLPoD | a few minutes | after `nsbootstrap` completes, ~5–10 min |
-| Combined stack | 35–50 min (blocks on readiness gates) | when apply finishes |
+| Combined stack | 35–50 min (waits for each component to be ready) | when apply finishes |
 
 ### …know whether it worked
 
@@ -124,8 +156,18 @@ How long it takes:
 |-----------|-------|
 | AIG | Netskope tenant shows the appliance **connected**; or `GET /api/v2/aig/appliances` |
 | Guardrails | `curl http://<private-ip>:8080/ping` → `{"status":"Healthy"}` from inside the VPC |
-| DLPoD | Bootstrap status commands in [`dlpod/README.md`](dlpod/README.md) §Verifying bootstrap |
+| DLPoD | Commands in [`dlpod/README.md`](dlpod/README.md) §Checking it worked |
 | Combined | `terraform output` and the per-component checks above |
+
+### …prove it works end to end
+
+After the AIG shows **connected**: in the tenant go to **Settings → Security
+Cloud Platform → AI Gateways**, select the appliance, add the customer's AI
+providers, then point a test client at `https://<aig public or private ip>:443`
+and send a prompt. It should show up in the tenant's AI Gateway activity with
+the Guardrails and DLP verdicts. Step-by-step:
+[`ai-services-all/new-vpc-public/README.md`](ai-services-all/new-vpc-public/README.md) §First test.
+Client-side proxy/SDK settings depend on the customer's tools — ask your SE.
 
 ### …fix something
 
@@ -133,7 +175,7 @@ How long it takes:
 |---------|-------|
 | AIG shows Disconnected / never enrolls / token expired / provider auth error | [`aig/docs/troubleshooting.md`](aig/docs/troubleshooting.md) |
 | Guardrails Phase 1 or 2 stalled, health check failing, SSM readiness stale | [`ai-services-all/new-vpc-public/docs/troubleshooting.md`](ai-services-all/new-vpc-public/docs/troubleshooting.md) §Guardrails |
-| DLPoD bootstrap not applied, TLS errors, AIG cannot reach DLPoD | same guide, §DLPoD; and [`dlpod/README.md`](dlpod/README.md) §Known issues |
+| DLPoD bootstrap not applied, TLS errors, AIG cannot reach DLPoD | same guide, §DLPoD; and [`dlpod/docs/ztp-bootstrap-reference.md`](dlpod/docs/ztp-bootstrap-reference.md) §Known issues |
 | `terraform destroy` hangs on subnet/VPC | same guide (VPC endpoint ENIs) |
 | Access denied during apply | [`aig/docs/iam-permissions.md`](aig/docs/iam-permissions.md) — name prefixes must match |
 | State lock / corrupted state | [`aig/docs/state-management.md`](aig/docs/state-management.md) |
@@ -142,18 +184,19 @@ Or run `/pov-troubleshoot`.
 
 ### …remove everything
 
-`terraform destroy` in each template directory, in reverse order for staged
-builds (AIG → DLPoD → Guardrails). AIG templates also remove the appliance
-from the Netskope tenant. The S3 image bucket and any remote-state bucket
-are not managed by these templates. `/pov-teardown` walks through it.
+`terraform destroy` in each template folder. For a staged build go in
+reverse order (AIG → DLPoD → Guardrails, because Guardrails owns the VPC).
+AIG templates also remove the appliance from the Netskope tenant. The S3
+image bucket and any remote-state bucket are not managed by these templates
+and stay. `/pov-teardown` walks through it.
 
 ### …understand how it works under the hood
 
 - AIG bootstrap via Secrets Manager: [`aig/README.md`](aig/README.md) §Bootstrap process
-- DLPoD zero-touch provisioning and `bootstrap.json` schema: [`dlpod/README.md`](dlpod/README.md)
+- DLPoD zero-touch provisioning and `bootstrap.json` schema: [`dlpod/docs/ztp-bootstrap-reference.md`](dlpod/docs/ztp-bootstrap-reference.md)
 - Guardrails two-phase boot: [`gpu-guardrails/README.md`](gpu-guardrails/README.md) §Setup process
 - Combined stack internals, TLS validation, CI/CD: [`ai-services-all/new-vpc-public/docs/devops.md`](ai-services-all/new-vpc-public/docs/devops.md)
-- Design decisions and constraints per module: the `CLAUDE.md` in each module directory (written for Claude, readable by humans)
+- Design decisions and constraints per module: the `CLAUDE.md` in each module folder (written for Claude, readable by humans)
 
 ### …run the tests
 
@@ -167,12 +210,30 @@ destroy real infrastructure. `dlpod/new-vpc-private/tests/` has a
 Run `/pov-curate` in Claude Code, or directly:
 
 ```bash
-scripts/curate.sh --customer acme --modules aig/new-vpc-private,gpu-guardrails/existing-vpc --region us-east-1 --zip
+scripts/curate.sh --customer acme --modules ai-services-all/new-vpc-public --region us-east-1 --zip
 ```
 
 Output goes to `dist/acme-<date>/` with a `MANIFEST.md` listing what was
 included and the result of a secret scan. See `CLAUDE.md` §Curating a
 customer package for the rules.
+
+---
+
+## Using Claude Code with this repo
+
+Open this folder in Claude Code and ask it anything. It reads `CLAUDE.md` for
+context and offers these commands:
+
+| Command | What it does |
+|---------|--------------|
+| `/pov-preflight` | Checks Terraform, AWS credentials, quotas, key pairs and env vars for the template you chose |
+| `/pov-deploy` | Walks you through `terraform.tfvars`, `init`, `plan`, `apply`, outputs and verification |
+| `/pov-troubleshoot` | Systematic diagnosis of a failed or unhealthy deployment |
+| `/pov-teardown` | Safe `terraform destroy` with the right ordering and reminders |
+| `/pov-curate` | *Netskope SEs only* — builds a customer-specific package |
+
+Without Claude Code, `scripts/preflight.sh <folder>` runs the same readiness
+checks from the shell.
 
 ---
 
@@ -219,18 +280,19 @@ name. Fine for a POV; change it for production.
 
 | Term | Meaning |
 |------|---------|
+| **Template** | A folder you run `terraform init` / `plan` / `apply` in — one of the `existing-vpc/`, `new-vpc-public/` or `new-vpc-private/` sub-folders |
 | **AIG / AIGW** | Netskope AI Gateway — the appliance that proxies AI traffic and applies policy |
 | **AI Guardrails** | LLM-based content inspection service the AIG calls; runs on a GPU instance |
 | **DLPoD** | DLP On-Demand — Netskope data loss prevention inspection appliance |
+| **Combined stack** | `ai-services-all/new-vpc-public/` — all three components in one apply; the recommended path |
+| **Staged build** | The fallback: installing Guardrails, DLPoD and AIG as three separate Terraform runs into one VPC, in that order |
 | **ZTP** | Zero-touch provisioning — DLPoD configures itself from `bootstrap.json` in EC2 user-data |
-| **Bootstrap secret** | Secrets Manager JSON the AIG reads at first boot; contains the enrollment token and optional `dlp` / `ai_guardrails` blocks |
+| **Bootstrap secret** | Secrets Manager JSON the AIG reads once at first boot; contains the enrollment token and optional `dlp` / `ai_guardrails` blocks |
 | **Enrollment token** | 24-hour token that lets the AIG register with the Netskope tenant |
 | **Persona** | DLPoD operating mode: `dlp-on-demand` or `dspm` |
-| **Staged build** | Fallback to the combined stack: deploying Guardrails, DLPoD and AIG as separate Terraform runs into one VPC |
-| **Template / root** | A directory you run `terraform` in (`existing-vpc/`, `new-vpc-public/`, `new-vpc-private/`) |
 | **Deployment role** | Least-privilege IAM role created by `aig/deployment-role/` for the person running Terraform |
 | **Instance profile** | IAM role attached to the EC2 instance itself (reads the bootstrap secret; pulls the Guardrails image) |
 | **SSM** | AWS Systems Manager Session Manager — shell access without SSH or open ports |
 | **Phase 1 / Phase 2** | Guardrails boot stages: NVIDIA driver + reboot, then Docker + container |
 | **Readiness gate** | A step in the combined-stack apply that waits for a component to report healthy |
-| **Remote state** | `terraform.tfstate` stored in S3 with KMS encryption and DynamoDB locking |
+| **State / remote state** | `terraform.tfstate`, Terraform's record of what it built; "remote" means stored in S3 with encryption and locking |

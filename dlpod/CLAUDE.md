@@ -13,13 +13,14 @@ provider. No SSH, console, or Netskope API calls are needed.
 
 ```
 dlpod/
-  README.md            # bootstrap.json (ZTP) schema reference — platform-agnostic
+  README.md            # Overview, template choice, first-boot behaviour
+  docs/ztp-bootstrap-reference.md   # bootstrap.json (ZTP) schema — platform-agnostic
   CLAUDE.md            # This file
   existing-vpc/        # EC2 + SG + IAM + TLS + Route 53 private zone, in your VPC
   new-vpc-private/     # + VPC, subnets, NAT GW; no Route 53 (see below)
 ```
 
-`dlpod/README.md` documents the ZTP schema for every platform the appliance
+`dlpod/docs/ztp-bootstrap-reference.md` documents the ZTP schema for every platform the appliance
 supports (AWS, Azure, GCP, OpenStack, VMware, seed ISO). Only AWS Terraform
 templates exist in this repo. If asked about Azure/GCP, point at the schema
 and the per-platform user-data delivery section; do not imply templates exist.
@@ -81,7 +82,7 @@ in state — which is why state should be remote and encrypted
 
 ## Common requests
 
-- **"How do I know bootstrap worked?"** — commands in `dlpod/README.md`
+- **"How do I know bootstrap worked?"** — commands in `dlpod/docs/ztp-bootstrap-reference.md`
   §Verifying bootstrap (status file, redacted applied record, service log).
   Needs SSM or SSH to the appliance; the templates default SSH off
   (`allowed_ssh_cidr = 127.0.0.1/32`).
@@ -93,7 +94,7 @@ in state — which is why state should be remote and encrypted
   Replacing the instance (`terraform apply -replace=aws_instance.dlpod`) is
   cleaner.
 - **"Email address rejected during cert request"** — no hyphen in the
-  local part. Known issue in `dlpod/README.md`.
+  local part. Known issue in `dlpod/docs/ztp-bootstrap-reference.md`.
 - **"Invalid timezone"** — falls back to UTC silently; use an exact IANA name.
 
 ## Do not change without care
@@ -107,5 +108,5 @@ in state — which is why state should be remote and encrypted
 ## Verification
 
 Answer from `main.tf`, `variables.tf`, `outputs.tf` in the template
-directory and the schema in `dlpod/README.md`. `new-vpc-private/tests/`
+directory and the schema in `dlpod/docs/ztp-bootstrap-reference.md`. `new-vpc-private/tests/`
 has a `terraform test` file (`validation.tftest.hcl`) for static checks.

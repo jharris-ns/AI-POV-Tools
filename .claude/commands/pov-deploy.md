@@ -7,7 +7,7 @@ Guide the user through deploying one template. Work only inside a leaf Terraform
 1. Confirm `/pov-preflight` has passed. If not, run it first.
 2. If `terraform.tfvars` does not exist, copy `terraform.tfvars.example` and help the user fill in every REQUIRED value using the table in the directory's `README.md`. Remind them: tokens and license keys go in environment variables, not this file.
 3. If any AIG template is involved and this is the first deployment in the AWS account, check whether `aig/deployment-role/` has been applied. See `aig/README.md` §"Step 0".
-   If this is a staged build (separate Guardrails / DLPoD / AIG templates), confirm the order: the VPC-creating template first, `existing-vpc/` templates after, AIG last. Before deploying `aig/existing-vpc/`, make sure the user has `ai_guardrails_host` from Guardrails and `dlp_host` + `ca_cert_pem` from DLPoD in hand — the AIG reads them once at first boot. Mapping table: `ai-services-all/README.md` §Staged build.
+   If this is a staged build (separate Guardrails / DLPoD / AIG templates), confirm the order: the VPC-creating template first, `existing-vpc/` templates after, AIG last. Before deploying `aig/existing-vpc/`, make sure the user has `ai_guardrails_host` from Guardrails and `dlp_host` + `ca_cert_pem` from DLPoD in hand — the AIG reads them once at first boot. Mapping table: `STAGED-BUILD.md`.
 4. `terraform init`
 5. `terraform plan -out=tfplan` — summarize what will be created in plain language (instance types, whether anything gets a public IP, Netskope API objects that will be registered). Ask for confirmation.
 6. `terraform apply tfplan`. Tell the user how long to expect, from the README:
