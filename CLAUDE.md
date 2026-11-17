@@ -29,9 +29,8 @@ AI-POV-Tools/
     preflight.sh                 # Checks Terraform, AWS creds, quotas, key pairs, env vars
     curate.sh                    # Builds a customer package under dist/ (SE use only)
   ai-services-all/
-    new-vpc-public/              # Full stack: AIG (public EIP) + Guardrails + DLPoD + bastion
-    ai-102-no-cert-setup/        # Full stack for a lab environment, without AIG or DLPoD certificate setup
-    ai-102/                      # Full stack for a lab environment, with AIG and DLPoD certificate setup
+    new-vpc-public-v5/           # Full stack: AIG (public EIP) + Guardrails + DLPoD + bastion (optional Win11 VM, LibreChat)
+    new-vpc-public/              # Previous version, kept for reference only — do not use or recommend
   aig/                           # AI Gateway
     CLAUDE.md
     deployment-role/             # Run once per AWS account: least-privilege deploy role
@@ -65,7 +64,7 @@ Ask these in order, or infer from what the user has already said.
 
 ```
 1. Which components?
-   ├── AIG + Guardrails + DLPoD → ai-services-all/new-vpc-public/   ← RECOMMENDED
+   ├── AIG + Guardrails + DLPoD → ai-services-all/new-vpc-public-v5/   ← RECOMMENDED
    │     One apply, one state, readiness gates, DNS and TLS wired up.
    │     Use the staged build below only if the customer explicitly wants
    │     to deploy one component at a time.
@@ -85,7 +84,7 @@ Ask these in order, or infer from what the user has already said.
 ```
 
 **Staged build (fallback, not the default)** — use only when the combined
-`ai-services-all/new-vpc-public/` stack is not wanted and the customer wishes
+`ai-services-all/new-vpc-public-v5/` stack is not wanted and the customer wishes
 to deploy one component at a time. The standalone templates exist for that
 case. All three should still land in one VPC: the first stage uses a
 `new-vpc-private/` template to create the network, the next two use
@@ -116,8 +115,10 @@ combined stack for that.
   only. Never write them into `terraform.tfvars`; they would land in state.
   The provider also accepts `server_url`/`api_key` variables as a fallback —
   do not recommend that path.
-- The DLPoD license goes in `TF_VAR_dlpod_licensekey`. All DLPoD-bearing
-  templates use the `dlpod_licensekey` variable name.
+- The DLPoD license goes in `TF_VAR_dlpod_licensekey` for the standalone
+  `dlpod/` templates. The combined stack `ai-services-all/new-vpc-public-v5/`
+  names it `netskope_onpremappliance_licensekey`, so use
+  `TF_VAR_netskope_onpremappliance_licensekey` there.
 - Never print, echo, or paste a token, license key, or `.tfstate` contents
   into the conversation. State files contain TLS private keys in plaintext.
 - Never commit `*.tfvars`, `*.tfstate*`, `tfplan*`, or `.terraform/`. They
@@ -211,12 +212,12 @@ Collect all of these before running the script:
 | "Which template should I use?" | §Choosing a module above |
 | "Am I ready to deploy?" | `/pov-preflight` or `scripts/preflight.sh` |
 | "Walk me through the deploy" | `/pov-deploy`, then the directory's `README.md` |
-| "It's not enrolling / not healthy / timed out" | `/pov-troubleshoot`; `aig/docs/troubleshooting.md`; `ai-services-all/new-vpc-public/docs/troubleshooting.md` |
+| "It's not enrolling / not healthy / timed out" | `/pov-troubleshoot`; `aig/docs/troubleshooting.md`; `ai-services-all/new-vpc-public-v5/docs/troubleshooting.md` |
 | "What permissions does the deployer need?" | `aig/docs/iam-permissions.md` |
 | "How do I remove everything?" | `/pov-teardown` |
 | "Build a package for customer X" | `/pov-curate` (SEs only) |
 | "What does bootstrap.json look like?" | `dlpod/docs/ztp-bootstrap-reference.md` |
-| "How do I store state safely?" | `aig/docs/state-management.md`; `ai-services-all/new-vpc-public/docs/deployment.md` |
+| "How do I store state safely?" | `aig/docs/state-management.md`; `ai-services-all/new-vpc-public-v5/docs/deployment.md` |
 
 ---
 

@@ -32,7 +32,7 @@ esac
 TFVARS="$DIR/terraform.tfvars"
 tfvar() { # tfvar <name> → value from terraform.tfvars (unquoted) or empty
   [[ -f "$TFVARS" ]] || return 0
-  grep -E "^\s*$1\s*=" "$TFVARS" | head -1 | sed -E 's/^[^=]*=\s*//; s/^"//; s/"\s*$//; s/\s*#.*$//'
+  grep -E "^[[:space:]]*$1[[:space:]]*=" "$TFVARS" | head -1 | sed -E 's/^[^=]*=[[:space:]]*//; s/^"//; s/"[[:space:]]*$//; s/[[:space:]]*#.*$//'
 }
 
 echo "Preflight for $DIR"
@@ -43,7 +43,8 @@ if command -v terraform >/dev/null; then
   TFV=$(terraform version -json 2>/dev/null | sed -n 's/.*"terraform_version": *"\([^"]*\)".*/\1/p')
   [[ -z "$TFV" ]] && TFV=$(terraform version | head -1 | sed -E 's/Terraform v//')
   MAJ=${TFV%%.*}; MIN=$(echo "$TFV" | cut -d. -f2)
-  if [[ "$MAJ" -gt 1 || ( "$MAJ" -eq 1 && "$MIN" -ge 5 ) ]]; then ok "terraform $TFV (≥ 1.5)"; else bad "terraform $TFV — need ≥ 1.5"; fi
+  NEED_MIN=5; [[ "$DIR" == ai-services-all/new-vpc-public-v5* ]] && NEED_MIN=9
+  if [[ "$MAJ" -gt 1 || ( "$MAJ" -eq 1 && "$MIN" -ge $NEED_MIN ) ]]; then ok "terraform $TFV (≥ 1.$NEED_MIN)"; else bad "terraform $TFV — need ≥ 1.$NEED_MIN"; fi
 else bad "terraform not found"; fi
 command -v aws >/dev/null && ok "aws cli present" || bad "aws cli not found"
 echo
@@ -63,12 +64,15 @@ if [[ $NEEDS_NS -eq 1 ]]; then
   [[ -n "${NETSKOPE_SERVER_URL:-}" ]] && ok "NETSKOPE_SERVER_URL set" || bad "NETSKOPE_SERVER_URL not set"
   [[ -n "${NETSKOPE_SERVER_URL:-}" && "${NETSKOPE_SERVER_URL}" != */api/v2 ]] && warn "NETSKOPE_SERVER_URL should end in /api/v2"
   [[ -n "${NETSKOPE_API_KEY:-}" ]]    && ok "NETSKOPE_API_KEY set"    || bad "NETSKOPE_API_KEY not set"
-  grep -qE '^\s*netskope_api_key\s*=' "$TFVARS" 2>/dev/null && bad "netskope_api_key is in terraform.tfvars — remove it; it would be written to state"
+  grep -qE '^[[:space:]]*netskope_api_key[[:space:]]*=' "$TFVARS" 2>/dev/null && bad "netskope_api_key is in terraform.tfvars — remove it; it would be written to state"
 fi
 if [[ $NEEDS_DLP -eq 1 ]]; then
-  if [[ -n "${TF_VAR_dlpod_licensekey:-}" ]]; then ok "TF_VAR_dlpod_licensekey set"
-  elif grep -qE '^\s*dlpod_licensekey\s*=' "$TFVARS" 2>/dev/null; then warn "DLPoD license key is in terraform.tfvars (allowed, file is gitignored) — TF_VAR_dlpod_licensekey is preferred"
-  else bad "DLPoD license key not set (export TF_VAR_dlpod_licensekey or set dlpod_licensekey in terraform.tfvars)"; fi
+  # The combined stack names the variable differently from the standalone dlpod/ templates
+  LICVAR=dlpod_licensekey; [[ "$DIR" == ai-services-all/new-vpc-public-v5* ]] && LICVAR=netskope_onpremappliance_licensekey
+  ENVLIC="TF_VAR_$LICVAR"
+  if [[ -n "${!ENVLIC:-}" ]]; then ok "$ENVLIC set"
+  elif grep -qE "^[[:space:]]*$LICVAR[[:space:]]*=" "$TFVARS" 2>/dev/null; then warn "DLPoD license key is in terraform.tfvars (allowed, file is gitignored) — $ENVLIC is preferred"
+  else bad "DLPoD license key not set (export $ENVLIC or set $LICVAR in terraform.tfvars)"; fi
 fi
 [[ $NEEDS_NS -eq 0 && $NEEDS_DLP -eq 0 ]] && ok "no secrets required for this template"
 echo
@@ -77,11 +81,11 @@ echo "terraform.tfvars"
 if [[ -f "$TFVARS" ]]; then
   ok "present"
   # Variables with no default in variables.tf must be set
-  awk '/^variable "/{name=$2; gsub(/"/,"",name); has=0} /^\s*default\s*=/{has=1} /^}/{if(name!=""){print name, has; name=""}}' "$DIR/variables.tf" \
+  awk '/^variable "/{name=$2; gsub(/"/,"",name); has=0} /^[[:space:]]*default[[:space:]]*=/{has=1} /^}/{if(name!=""){print name, has; name=""}}' "$DIR/variables.tf" \
   | while read -r v has; do
       [[ "$has" == 1 ]] && continue
-      case "$v" in netskope_api_key|netskope_server_url|dlpod_licensekey) continue;; esac
-      grep -qE "^\s*$v\s*=" "$TFVARS" && ok "$v set" || bad "$v has no default and is not in terraform.tfvars"
+      case "$v" in netskope_api_key|netskope_server_url|dlpod_licensekey|netskope_onpremappliance_licensekey) continue;; esac
+      grep -qE "^[[:space:]]*$v[[:space:]]*=" "$TFVARS" && ok "$v set" || bad "$v has no default and is not in terraform.tfvars"
     done
 else
   bad "missing — cp $DIR/terraform.tfvars.example $TFVARS and fill in REQUIRED values"
@@ -90,7 +94,7 @@ echo
 
 if [[ -n "$REGION" ]] && aws sts get-caller-identity >/dev/null 2>&1; then
   echo "AWS resources in $REGION"
-  for kv in key_name aig_key_name guardrails_key_pair_name key_pair_name dlpod_key_name bastion_key_name; do
+  for kv in key_name aig_key_name guardrails_key_pair_name key_pair_name dlpod_key_name bastion_key_name dlpod_key_pair_name win11_key_pair_name librechat_key_pair_name bastion_key_pair_name; do
     K=$(tfvar "$kv"); [[ -z "$K" ]] && continue
     aws ec2 describe-key-pairs --region "$REGION" --key-names "$K" >/dev/null 2>&1 && ok "key pair '$K' exists ($kv)" || bad "key pair '$K' not found in $REGION ($kv)"
   done
@@ -99,12 +103,14 @@ if [[ -n "$REGION" ]] && aws sts get-caller-identity >/dev/null 2>&1; then
     aws ec2 describe-images --region "$REGION" --image-ids "$A" >/dev/null 2>&1 && ok "AMI $A visible ($av)" || bad "AMI $A not visible in $REGION ($av) — wrong region or Marketplace terms not accepted"
   done
   if [[ $NEEDS_GR -eq 1 ]]; then
-    B=$(tfvar image_s3_bucket); KEY=$(tfvar image_s3_key); [[ -z "$KEY" ]] && KEY="aisecurity-llm.tgz"
+    B=$(tfvar guardrails_llm_image_s3_bucket); [[ -z "$B" ]] && B=$(tfvar image_s3_bucket)
+    KEY=$(tfvar guardrails_llm_image_s3_key); [[ -z "$KEY" ]] && KEY=$(tfvar image_s3_key); [[ -z "$KEY" ]] && KEY="aisecurity-llm.tgz"
     if [[ -n "$B" ]]; then
       aws s3api head-object --bucket "$B" --key "$KEY" >/dev/null 2>&1 && ok "s3://$B/$KEY exists" || bad "s3://$B/$KEY not found or not readable"
       BL=$(aws s3api get-bucket-location --bucket "$B" --query LocationConstraint --output text 2>/dev/null); [[ "$BL" == "None" ]] && BL="us-east-1"
       [[ -n "$BL" && "$BL" != "$REGION" ]] && bad "bucket $B is in $BL, template region is $REGION — must match"
-    else warn "image_s3_bucket not set in terraform.tfvars"; fi
+    elif [[ -n "$(tfvar guardrails_ami_id)" ]]; then ok "guardrails_ami_id set — no S3 image needed"
+    else warn "Guardrails image bucket not set in terraform.tfvars (image_s3_bucket, or guardrails_llm_image_s3_bucket / guardrails_ami_id for the combined stack)"; fi
     Q=$(aws service-quotas get-service-quota --region "$REGION" --service-code ec2 --quota-code L-DB2E81BA --query 'Quota.Value' --output text 2>/dev/null)
     if [[ -n "$Q" && "$Q" != "None" ]]; then
       [[ "${Q%.*}" -ge 4 ]] && ok "G/VT on-demand vCPU quota: ${Q%.*}" || bad "G/VT on-demand vCPU quota is ${Q%.*}; need ≥ 4 for g4dn.xlarge"

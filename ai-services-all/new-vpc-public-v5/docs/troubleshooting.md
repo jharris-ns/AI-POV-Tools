@@ -4,7 +4,7 @@
 
 | Component | Log Location | Health Check |
 |-----------|-------------|--------------|
-| Guardrails Phase 1 | `/var/log/user-data.log` on instance | SSM Parameter `/<prefix>/guardrails-ready` = `healthy` |
+| Guardrails Phase 1 | `/var/log/user-data.log` on instance | SSM Parameter `/<prefix>/guardrails-ready` = `healthy:<instance id>` |
 | Guardrails Phase 2 | `/var/log/guardrails-phase2.log` on instance | `curl http://10.0.2.10:8080/ping` → `{"status":"Healthy"}` |
 | DLPoD | `/var/log/nsbootstrap.log` on instance | `curl -sk https://10.0.2.20/` → HTTP response (any code) |
 | AIG | AIG appliance logs via Netskope tenant | Appliance shows "Connected" in Settings → AI Gateway |
@@ -17,13 +17,13 @@ All instances are accessible via SSM Session Manager — no SSH, no bastion requ
 
 ```bash
 # Guardrails
-aws ssm start-session --target $(terraform output -raw guardrails_instance_id) --region YOUR_REGION
+aws ssm start-session --target $(terraform output -raw guardrails_aws_instance_id) --region YOUR_REGION
 
 # Bastion (if deployed)
 aws ssm start-session --target $(terraform output -raw bastion_instance_id) --region YOUR_REGION
 
 # AIG
-aws ssm start-session --target $(terraform output -raw aig_instance_id) --region YOUR_REGION
+aws ssm start-session --target $(terraform output -raw aig_aws_instance_id) --region YOUR_REGION
 ```
 
 ---
@@ -38,20 +38,20 @@ Use SSM Send Command for a quick non-interactive status check (no session needed
 # One-shot status snapshot
 CMDID=$(aws ssm send-command \
   --region YOUR_REGION \
-  --instance-ids $(terraform output -raw guardrails_instance_id) \
+  --instance-ids $(terraform output -raw guardrails_aws_instance_id) \
   --document-name AWS-RunShellScript \
-  --parameters 'commands=["echo === Phase1 ===; tail -3 /var/log/user-data.log 2>/dev/null; echo === Phase2 ===; tail -3 /var/log/guardrails-phase2.log 2>/dev/null; echo === Docker ===; docker ps 2>/dev/null | head -3 || echo no-docker; echo === SSM param ===; aws ssm get-parameter --name /YOUR_PREFIX-guardrails/guardrails-ready --region YOUR_REGION --query Parameter.Value --output text 2>/dev/null || echo not-set"]' \
+  --parameters 'commands=["echo === Phase1 ===; tail -3 /var/log/user-data.log 2>/dev/null; echo === Phase2 ===; tail -3 /var/log/guardrails-phase2.log 2>/dev/null; echo === Docker ===; docker ps 2>/dev/null | head -3 || echo no-docker; echo === SSM param ===; aws ssm get-parameter --name /YOUR_PREFIX/guardrails-ready --region YOUR_REGION --query Parameter.Value --output text 2>/dev/null || echo not-set"]' \
   --query Command.CommandId --output text)
 sleep 12
 aws ssm get-command-invocation \
   --region YOUR_REGION --command-id "$CMDID" \
-  --instance-id $(terraform output -raw guardrails_instance_id) \
+  --instance-id $(terraform output -raw guardrails_aws_instance_id) \
   --query StandardOutputContent --output text
 ```
 
 For a live interactive tail, open a session:
 ```bash
-aws ssm start-session --target $(terraform output -raw guardrails_instance_id) --region YOUR_REGION
+aws ssm start-session --target $(terraform output -raw guardrails_aws_instance_id) --region YOUR_REGION
 sudo tail -f /var/log/user-data.log          # Phase 1
 sudo tail -f /var/log/guardrails-phase2.log  # Phase 2
 ```
@@ -106,16 +106,29 @@ sudo docker ps
 sudo docker logs $(sudo docker ps -q)
 ```
 
-### Stale SSM readiness parameter
+### Guardrails readiness gate never passes
 
-If `terraform apply` passes the Guardrails readiness gate instantly on a fresh deploy but Guardrails isn't actually ready, a stale parameter from a previous deployment is the cause. The readiness gate (`null_resource.guardrails_ready`) deletes the parameter before polling, so this should be self-correcting. To manually clear it:
+The gate waits for the SSM parameter to equal `healthy:<Guardrails instance id>`. Read what the instance last reported:
 
 ```bash
-aws ssm delete-parameter \
-  --name "/YOUR_PREFIX-guardrails/guardrails-ready" \
-  --region YOUR_REGION
-terraform apply  # re-run; gate will now wait properly
+aws ssm get-parameter \
+  --name "/YOUR_PREFIX/guardrails-ready" \
+  --region YOUR_REGION --query Parameter.Value --output text
 ```
+
+A value left by an earlier instance cannot satisfy the gate, because the instance ID is part of the value. If the parameter still reads `Guardrails booting` long after the instance started, the instance is not reporting: check `/var/log/user-data.log` and `/var/log/guardrails-phase2.log` on it, and that the instance role still allows `ssm:PutParameter` on the parameter.
+
+### AIG came up but the DLP or Guardrails host is not set
+
+The AIG Configuration API rejects the DLP host while DLPoD is not responding, and the AI Guardrails host while Guardrails is not responding. If the AIG booted before them (the `wait_for_*` variables are `false`), its bootstrap completes but fails to set those hosts. This is expected and the bastion script fixes it: it keeps retrying until the instances are healthy. With a pre-built Guardrails VM that takes about 30 minutes after `terraform apply` starts.
+
+```bash
+aws ssm get-parameter --name "/YOUR_PREFIX/aig-ready" \
+  --region YOUR_REGION --query Parameter.Value --output text
+# passed: prereqs, instance, api, enrollment, certificate | waiting on: dlp | then: guardrails | last error: ...
+```
+
+If a step stays in `waiting on` after DLPoD and Guardrails are healthy, read `/var/log/aig-cert-setup.log` on the bastion for the API's error. With `enable_bastion = false` nothing retries, so set it back to `true`.
 
 ---
 
@@ -298,9 +311,10 @@ terraform apply \
 ```bash
 terraform apply \
   -replace=aws_instance.guardrails \
-  -replace=null_resource.guardrails_ready
-# This will also recreate null_resource.dlpod_ready and aws_instance.aig
-# (because AIG depends on both readiness gates)
+  -replace='null_resource.guardrails_ready[0]'
+# The gate has an index because it exists only when wait_for_guardrails_to_deploy_aig
+# is true; drop that -replace if it is false.
+# This will also recreate aws_instance.aig (the AIG depends on the gate)
 ```
 
 ### Rebuild DLPoD
@@ -308,6 +322,8 @@ terraform apply \
 ```bash
 terraform apply \
   -replace=aws_instance.dlpod \
-  -replace=null_resource.dlpod_ready
+  -replace='null_resource.dlpod_ready[0]'
+# The gate exists only when wait_for_dlpod_to_deploy_aig is true; drop that
+# -replace if it is false.
 # AIG will also be recreated (depends on dlpod_ready)
 ```

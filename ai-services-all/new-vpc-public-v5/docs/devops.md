@@ -136,13 +136,13 @@ The leaf cert and private key go only to DLPoD:
 
 ### Guardrails Bootstrap (Two-Phase)
 
-The instance uses `guardrails_ami_id` if set (a custom Ubuntu-based AMI with the NVIDIA driver, NVIDIA Container Toolkit, Docker and the LLM image pre-installed), otherwise stock Ubuntu 22.04. The userdata is idempotent: it checks each component, installs what is missing, upgrades what is present, and restarts the container only if something changed. The same script therefore works on either AMI; stock Ubuntu just takes the full install path.
+The instance uses `guardrails_ami_id` if set (a custom Ubuntu-based AMI with the NVIDIA driver, NVIDIA Container Toolkit, Docker and the LLM image pre-installed), otherwise stock Ubuntu 24.04. The userdata is idempotent: it checks each component, installs what is missing, upgrades what is present, and restarts the container only if something changed. The same script therefore works on either AMI; stock Ubuntu just takes the full install path.
 
 **Phase 1 — EC2 UserData (runs at first boot):**
-1. Install `curl`, `jq`, `ubuntu-drivers-common` (and `awscli` if no `aws` CLI exists); apply OS upgrades (Ubuntu 22.04 runs automatic package updates at first boot, so apt waits on the dpkg lock)
+1. Install `curl`, `jq` (and AWS CLI v2 as a snap, if no `aws` CLI exists); apply OS upgrades (Ubuntu 24.04 runs automatic package updates at first boot, so apt waits on the dpkg lock)
 2. Set the `/<prefix>/guardrails-ready` SSM parameter to `Guardrails just starting`
 3. Snapshot installed versions of the NVIDIA driver, NVIDIA Container Toolkit and Docker to `/var/lib/guardrails-setup/before.env`
-4. NVIDIA driver: if no apt driver package and `nvidia-smi` fails, run `ubuntu-drivers install`; if a driver package exists, `apt-get install --only-upgrade` it
+4. NVIDIA driver (branch 580, set by `NVIDIA_DRIVER_BRANCH`): if no apt driver package and `nvidia-smi` fails, add NVIDIA's CUDA apt repository, install `nvidia-driver-pinning-580`, then `cuda-drivers-580` (plus `dkms` and the kernel headers it builds against); if a driver package exists, pin the branch (only when the package is already on 580) and `apt-get install --only-upgrade` it
 5. Write Phase 2 script to `/opt/guardrails-phase2.sh` and install/enable `guardrails-setup.service`
 6. Reboot **only if** the driver was installed/upgraded, `nvidia-smi` is not working, or `/var/run/reboot-required` exists; otherwise start Phase 2 immediately
 
@@ -226,7 +226,7 @@ This occurs even though the cert has a valid IP SAN (`IP Address:10.0.2.20`). Us
 ```hcl
 # backend.hcl — do not commit
 bucket         = "your-tfstate-bucket"
-key            = "ai-services/new-vpc-public/terraform.tfstate"
+key            = "ai-services/new-vpc-public-v5/terraform.tfstate"
 region         = "us-west-1"
 encrypt        = true
 kms_key_id     = "arn:aws:kms:..."
