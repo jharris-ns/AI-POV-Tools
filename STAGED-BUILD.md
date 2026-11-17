@@ -1,6 +1,6 @@
 # Staged build — deploying the three components one at a time
 
-> **Use this only if the combined `ai-services-all/new-vpc-public/` stack is not wanted.** The staged build is the fallback for customers who wish to deploy one component at a time; it involves three state files, manual hand-off of outputs between runs, and more opportunities for mistakes.
+> **Use this only if the combined `ai-services-all/new-vpc-public-v5/` stack is not wanted.** The staged build is the fallback for customers who wish to deploy one component at a time; it involves three state files, manual hand-off of outputs between runs, and more opportunities for mistakes.
 
 The standalone templates exist so the three appliances can be deployed **one at a time**, each as its own `terraform apply` with its own state. All three should still land in **one VPC**: the first stage uses a `new-vpc-private/` template to create the network, and the next two use `existing-vpc/` templates to join it.
 
@@ -101,7 +101,7 @@ Set in `terraform.tfvars`:
 
 ## Notes
 
-- The AIG in `aig/existing-vpc/` gets no public IP. Clients reach it over VPN, peering, or from inside the VPC. If the POV needs an **internet-reachable** AIG together with Guardrails and DLPoD, use the combined [`ai-services-all/new-vpc-public/`](ai-services-all/new-vpc-public/README.md) stack — there is no staged path to a public AIG, because `aig/new-vpc-public/` creates its own VPC and would have to run first, before the endpoints it needs exist.
+- The AIG in `aig/existing-vpc/` gets no public IP. Clients reach it over VPN, peering, or from inside the VPC. If the POV needs an **internet-reachable** AIG together with Guardrails and DLPoD, use the combined [`ai-services-all/new-vpc-public-v5/`](ai-services-all/new-vpc-public-v5/README.md) stack — there is no staged path to a public AIG, because `aig/new-vpc-public/` creates its own VPC and would have to run first, before the endpoints it needs exist.
 - Security groups: Guardrails `allowed_service_cidr` (default `10.0.0.0/8`) and DLPoD `allowed_inspection_cidr` must include the AIG's subnet.
 - The AIG reaches DLPoD by hostname (`dlp.aigw.internal`) and verifies the TLS SAN; `dlpod/existing-vpc/` creates the Route 53 private zone. If the AIG ends up in a different VPC, associate the zone with it (`route53_zone_id` output).
 - Each stage has its own state file. Keep all three; `terraform destroy` needs them.

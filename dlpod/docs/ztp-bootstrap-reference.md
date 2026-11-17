@@ -359,4 +359,4 @@ reboot
 
 ## Terraform templates
 
-The AWS templates in this repository (`../existing-vpc/`, `../new-vpc-private/`, and the combined `../../ai-services-all/new-vpc-public/`) assemble `bootstrap.json` from Terraform variables and deliver it as EC2 user-data. See [`../README.md`](../README.md) to choose one.
+The AWS templates in this repository (`../existing-vpc/`, `../new-vpc-private/`, and the combined `../../ai-services-all/new-vpc-public-v5/`) assemble `bootstrap.json` from Terraform variables and deliver it as EC2 user-data. See [`../README.md`](../README.md) to choose one.

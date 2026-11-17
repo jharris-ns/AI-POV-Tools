@@ -159,7 +159,7 @@ Stage 2: gpu-guardrails/existing-vpc/     →  in: vpc_id, subnet_id;  out: ai_g
 Stage 3: aig/existing-vpc/                →  in: vpc_id, subnet_id, guardrails_host, dlp_host, dlp_ca_cert_pem
 ```
 
-A staged build is itself the fallback to the combined `ai-services-all/new-vpc-public/` stack. Within a staged build, the preferred Stage 1 is `gpu-guardrails/new-vpc-private/` with `dlpod/existing-vpc/` as Stage 2, because `dlpod/existing-vpc/` creates the Route 53 private zone the AIG needs to reach DLPoD by hostname. This template does not create DNS — if you start here, set `system_hostname` and provide resolution for it in the VPC yourself.
+A staged build is itself the fallback to the combined `ai-services-all/new-vpc-public-v5/` stack. Within a staged build, the preferred Stage 1 is `gpu-guardrails/new-vpc-private/` with `dlpod/existing-vpc/` as Stage 2, because `dlpod/existing-vpc/` creates the Route 53 private zone the AIG needs to reach DLPoD by hostname. This template does not create DNS — if you start here, set `system_hostname` and provide resolution for it in the VPC yourself.
 
 See [ai-services-all/README.md](../../STAGED-BUILD.md) for the full workflow.
 
