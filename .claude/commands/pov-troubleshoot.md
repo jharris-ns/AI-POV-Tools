@@ -7,7 +7,7 @@ Diagnose systematically. Collect facts before proposing fixes.
 1. Which template directory, and what is the symptom? (apply error, appliance Disconnected, Guardrails never Healthy, DLPoD TLS error, destroy hanging, …)
 2. Pull the relevant guide and follow it before improvising:
    - AIG: `aig/docs/troubleshooting.md`
-   - Combined stack, Guardrails, DLPoD, bastion: `ai-services-all/new-vpc-public/docs/troubleshooting.md`
+   - Combined stack, Guardrails, DLPoD, bastion: `ai-services-all/new-vpc-public-v5/docs/troubleshooting.md`
    - DLPoD bootstrap behaviour and log locations: `dlpod/docs/ztp-bootstrap-reference.md` §"Verifying bootstrap" and §"Known issues"
 3. Gather evidence (ask the user to run these and paste results, redacting anything sensitive):
    - `terraform output`

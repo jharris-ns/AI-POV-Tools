@@ -27,8 +27,10 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
-  # dtavernier - added profile to support aws login
-  profile = "terraform-aws"
+  # No profile is set here. Select credentials with the AWS_PROFILE environment
+  # variable (or any other standard AWS credential source). The readiness gates
+  # run the aws CLI from this machine, and it reads the same environment, so the
+  # provider and the gates always use the same credentials.
 
   default_tags {
     tags = merge(
@@ -57,14 +59,14 @@ provider "netskope" {
 
 data "aws_region" "current" {}
 
-# Latest Ubuntu 22.04 LTS AMI (Canonical account 099720109477)
-data "aws_ami" "ubuntu_22_04" {
+# Latest Ubuntu 24.04 LTS AMI (Canonical account 099720109477)
+data "aws_ami" "ubuntu_24_04" {
   most_recent = true
   owners      = ["099720109477"]
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
 
   filter {
@@ -85,6 +87,8 @@ locals {
   guardrails_name = "${var.aws_object_unique_prefix}-guardrails"
   dlpod_name      = "${var.aws_object_unique_prefix}-dlpod"
   bastion_name    = "${var.aws_object_unique_prefix}-bastion"
+  win11_name      = "${var.aws_object_unique_prefix}-win11"
+  librechat_name  = "${var.aws_object_unique_prefix}-librechat"
   secret_name     = coalesce(var.secret_name, "aig/${var.aws_object_unique_prefix}/bootstrap")
 
   # Extract the parent zone from dlpod_hostname (e.g. "dlp.aig.internal" → "aig.internal")

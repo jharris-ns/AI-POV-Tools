@@ -7,7 +7,7 @@ Terraform state for this template contains TLS private keys (the lab root CA and
 ```hcl
 # backend.hcl
 bucket         = "my-tfstate-bucket"
-key            = "ai-services/new-vpc-public/terraform.tfstate"
+key            = "ai-services/new-vpc-public-v5/terraform.tfstate"
 region         = "YOUR_REGION"
 encrypt        = true
 kms_key_id     = "arn:aws:kms:YOUR_REGION:123456789:key/YOUR_KEY_ID"

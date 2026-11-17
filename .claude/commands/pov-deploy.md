@@ -2,7 +2,7 @@
 description: Guided terraform init / plan / apply for a Netskope POV template
 ---
 
-Guide the user through deploying one template. Work only inside a leaf Terraform root (`*/existing-vpc/`, `*/new-vpc-public/`, `*/new-vpc-private/`, or `ai-services-all/new-vpc-public/`).
+Guide the user through deploying one template. Work only inside a leaf Terraform root (`*/existing-vpc/`, `*/new-vpc-public/`, `*/new-vpc-private/`, or `ai-services-all/new-vpc-public-v5/`).
 
 1. Confirm `/pov-preflight` has passed. If not, run it first.
 2. If `terraform.tfvars` does not exist, copy `terraform.tfvars.example` and help the user fill in every REQUIRED value using the table in the directory's `README.md`. Remind them: tokens and license keys go in environment variables, not this file.

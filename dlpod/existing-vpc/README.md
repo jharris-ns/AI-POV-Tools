@@ -2,7 +2,7 @@
 
 Deploys a Netskope DLP On-Demand (DLPoD) appliance into an existing AWS VPC with a single `terraform apply`. DLPoD is zero-touch provisioned — Terraform generates TLS certificates and delivers the full bootstrap config via EC2 user-data. No manual console steps are required.
 
-Use this template as **Stage 2** of a staged build — the fallback when the combined `ai-services-all/new-vpc-public/` stack is not wanted and Guardrails, DLPoD, and the AIG are deployed one at a time. See [staged build workflow](#staged-build-workflow).
+Use this template as **Stage 2** of a staged build — the fallback when the combined `ai-services-all/new-vpc-public-v5/` stack is not wanted and Guardrails, DLPoD, and the AIG are deployed one at a time. See [staged build workflow](#staged-build-workflow).
 
 ---
 

@@ -10,7 +10,7 @@ Ask only for what the SE has not already told you. You need:
 
 1. Customer short name (filesystem-safe: letters, digits, `.`, `_`, `-`)
 2. Components: AIG, Guardrails, DLPoD, or all
-3. Combined single-apply stack (`ai-services-all/new-vpc-public`) or separate/staged modules
+3. Combined single-apply stack (`ai-services-all/new-vpc-public-v5`) or separate/staged modules
 4. Existing VPC or new VPC
 5. For AIG in a new VPC: internet-reachable (`new-vpc-public`) or private (`new-vpc-private`)
 6. Include regression tests (`aig/tests/`)? Default no.
@@ -20,7 +20,7 @@ Ask only for what the SE has not already told you. You need:
 Map the answers to one or more of these roots:
 
 ```
-ai-services-all/new-vpc-public
+ai-services-all/new-vpc-public-v5
 aig/existing-vpc  aig/new-vpc-public  aig/new-vpc-private
 gpu-guardrails/existing-vpc  gpu-guardrails/new-vpc-private
 dlpod/existing-vpc  dlpod/new-vpc-private
@@ -28,7 +28,7 @@ dlpod/existing-vpc  dlpod/new-vpc-private
 
 Guardrails and DLPoD have no public option.
 
-If the customer wants all three components, recommend `ai-services-all/new-vpc-public` first. Offer a staged build only if they decline the combined stack and want to deploy one component at a time. Staged builds: the first stage must create the VPC and the rest join it. The staged set to use is `gpu-guardrails/new-vpc-private,dlpod/existing-vpc,aig/existing-vpc`. Only choose all-`existing-vpc` roots if the customer already has a VPC with a private subnet and NAT. A staged build cannot give an internet-reachable AIG — if they need that with Guardrails/DLPoD, select `ai-services-all/new-vpc-public` instead.
+If the customer wants all three components, recommend `ai-services-all/new-vpc-public-v5` first. Offer a staged build only if they decline the combined stack and want to deploy one component at a time. Staged builds: the first stage must create the VPC and the rest join it. The staged set to use is `gpu-guardrails/new-vpc-private,dlpod/existing-vpc,aig/existing-vpc`. Only choose all-`existing-vpc` roots if the customer already has a VPC with a private subnet and NAT. A staged build cannot give an internet-reachable AIG — if they need that with Guardrails/DLPoD, select `ai-services-all/new-vpc-public-v5` instead.
 
 ## 2. Confirm, then run
 

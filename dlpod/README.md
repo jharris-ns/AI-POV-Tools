@@ -2,7 +2,7 @@
 
 DLP On-Demand is the Netskope appliance that inspects AI traffic for sensitive data. The AI Gateway sends content to it over TLS and acts on the verdict. These templates deploy a DLPoD appliance on AWS with a single `terraform apply`. The appliance is zero-touch provisioned: Terraform generates its TLS certificates and configuration and hands them to the instance at first boot. No console or SSH steps are needed.
 
-> **Deploying the full stack?** Use the combined [`ai-services-all/new-vpc-public/`](../ai-services-all/new-vpc-public/README.md) template instead — it includes DLPoD and wires it to the AI Gateway for you. The templates here are for deploying DLPoD on its own, or as part of a [staged build](../STAGED-BUILD.md).
+> **Deploying the full stack?** Use the combined [`ai-services-all/new-vpc-public-v5/`](../ai-services-all/new-vpc-public-v5/README.md) template instead — it includes DLPoD and wires it to the AI Gateway for you. The templates here are for deploying DLPoD on its own, or as part of a [staged build](../STAGED-BUILD.md).
 
 ---
 
@@ -60,7 +60,7 @@ cat /opt/ns/states/nsbootstrap/bootstrap.json.done    # what was applied (secret
 journalctl -u nsbootstrap.service                     # service log
 ```
 
-From the AI Gateway side, `curl -s --cacert <ca_cert_pem> https://dlp.aigw.internal/ -w "%{http_code}"` should return `404` once the service is up (the root path is simply not mapped). Details and failure modes: [`ai-services-all/new-vpc-public/docs/troubleshooting.md`](../ai-services-all/new-vpc-public/docs/troubleshooting.md) §DLPoD.
+From the AI Gateway side, `curl -s --cacert <ca_cert_pem> https://dlp.aigw.internal/ -w "%{http_code}"` should return `404` once the service is up (the root path is simply not mapped). Details and failure modes: [`ai-services-all/new-vpc-public-v5/docs/troubleshooting.md`](../ai-services-all/new-vpc-public-v5/docs/troubleshooting.md) §DLPoD.
 
 ---
 
@@ -84,4 +84,4 @@ In the combined stack these are wired automatically. In a staged build you paste
 - [Existing VPC guide](existing-vpc/README.md)
 - [New VPC — private subnet guide](new-vpc-private/README.md)
 - [`bootstrap.json` zero-touch provisioning reference](docs/ztp-bootstrap-reference.md) — the full schema, worked examples, how to deliver it on Azure / GCP / VMware, known issues
-- [Troubleshooting](../ai-services-all/new-vpc-public/docs/troubleshooting.md) §DLPoD
+- [Troubleshooting](../ai-services-all/new-vpc-public-v5/docs/troubleshooting.md) §DLPoD

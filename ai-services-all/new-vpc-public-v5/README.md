@@ -126,7 +126,7 @@ export NETSKOPE_SERVER_URL="https://mycompany.goskope.com/api/v2"
 export NETSKOPE_API_KEY="your-rest-api-v2-token"
 ```
 
-**AWS credentials:** A configured AWS CLI profile is required. If you haven't set one up, follow the [AWS CLI configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html). Terraform picks up your default profile automatically — to use a named profile, run `export AWS_PROFILE=your-profile-name` before applying.
+**AWS credentials:** A configured AWS CLI profile is required. If you haven't set one up, follow the [AWS CLI configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html). Terraform picks up your default profile automatically — to use a named profile, run `export AWS_PROFILE=your-profile-name` before applying. Use the environment variable rather than a `profile` setting in the provider block: the `aws` CLI commands that run during `apply` (the readiness gates) read `AWS_PROFILE` too, but ignore the provider block, so a `profile` set there would leave them without credentials. If you use `aws sso login` or `aws login`, run it for that profile first.
 
 **DLPoD license key:** The `netskope_onpremappliance_licensekey` variable is marked sensitive. Pass it via environment variable rather than putting it in `terraform.tfvars`:
 
@@ -143,7 +143,8 @@ Or set it in `terraform.tfvars` (the file is gitignored). Either approach works.
 ```bash
 # 1. Copy and fill in variables
 cp terraform.tfvars.example terraform.tfvars
-# Required: availability_zone, and either guardrails_llm_image_s3_bucket or guardrails_ami_id
+# Required: aws_tag_owner, aws_tag_purpose, aws_tag_terminate_after, availability_zone, aig_ami_id,
+# and either guardrails_llm_image_s3_bucket or guardrails_ami_id
 # Set netskope_onpremappliance_licensekey via TF_VAR_netskope_onpremappliance_licensekey or in terraform.tfvars
 
 # 2. Upload the Guardrails Docker image to S3
@@ -164,17 +165,30 @@ terraform apply
 
 | Variable | Description | Example |
 |----------|-------------|---------|
+| `aws_tag_owner` | Email address of the person responsible for the deployment. Applied to every resource as the `owner` tag. | `"user@example.com"` |
+| `aws_tag_purpose` | Purpose of the deployment (`purpose` tag). No commas. | `"pov"` |
+| `aws_tag_terminate_after` | Date after which the deployment may be torn down, `YYYY-MM-DD` (`terminate_after` tag) | `"2026-12-31"` |
 | `availability_zone` | Availability zone for all subnets — must be valid for `aws_region` | `"us-east-1a"` |
-| `aig_ami_id` | AMI ID for the AIG appliance in your region. Subscribe on AWS Marketplace and accept the terms. | `"ami-0a66805d7fb085df4"` |
+| `aig_ami_id` | AMI ID for the AIG appliance in your region. The default is valid for us-east-1 only; set it for any other region. Subscribe on AWS Marketplace and accept the terms. | `"ami-0a66805d7fb085df4"` |
 | `netskope_onpremappliance_licensekey` | Netskope license key for the DLPoD appliance (sensitive — use `TF_VAR_netskope_onpremappliance_licensekey`) | — |
 | `netskope_server_url` | Netskope tenant API URL. Recommended: set via `NETSKOPE_SERVER_URL` env var (see [Environment variables](#environment-variables)). | `"https://tenant.goskope.com"` |
 | `netskope_api_key` | Netskope REST API v2 token (sensitive). Recommended: set via `NETSKOPE_API_KEY` env var. | — |
-| `bastion_private_ip` | Fixed private IP for the bastion — must be within `public_subnet_cidr` | `"10.0.1.11"` |
-| `enable_bastion` | Create the bastion and everything that exists only for it. `true` by default; see [Removing the bastion](#removing-the-bastion). | `true` |
-| `wait_for_guardrails_to_deploy_dlpod` | Wait for Guardrails to be healthy before creating DLPoD. See [Deployment ordering](#deployment-ordering). | `false` |
-| `wait_for_guardrails_to_deploy_aig` | Wait for Guardrails to be healthy before creating the AIG | `false` |
-| `wait_for_dlpod_to_deploy_aig` | Wait for DLPoD's HTTPS service before creating the AIG | `false` |
-| `wait_for_aig_to_complete_template` | Wait for `aig-ready` to be healthy before `terraform apply` finishes | `false` |
+| `guardrails_llm_image_s3_bucket` or `guardrails_ami_id` | One of the two: the S3 bucket holding the Guardrails image, or a custom AMI that already contains it. See [Guardrails](#guardrails). | `"my-guardrails-bucket"` |
+
+`aws_tag_owner`, `aws_tag_purpose` and `aws_tag_terminate_after` are validated at plan time, so a missing or malformed value fails before anything is created. `aws_tag_project` and `aws_tag_description` are optional.
+
+### Bastion and readiness gates
+
+These have defaults and are listed here because they change how the deployment behaves.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `enable_bastion` | `true` | Create the bastion and everything that exists only for it. See [Removing the bastion](#removing-the-bastion). |
+| `bastion_private_ip` | `"10.0.1.11"` | Fixed private IP for the bastion — must be within `public_subnet_cidr` |
+| `wait_for_guardrails_to_deploy_dlpod` | `false` | Wait for Guardrails to be healthy before creating DLPoD. See [Deployment ordering](#deployment-ordering). |
+| `wait_for_guardrails_to_deploy_aig` | `false` | Wait for Guardrails to be healthy before creating the AIG |
+| `wait_for_dlpod_to_deploy_aig` | `false` | Wait for DLPoD's HTTPS service before creating the AIG |
+| `wait_for_aig_to_complete_template` | `false` | Wait for `aig-ready` to be healthy before `terraform apply` finishes |
 
 ### SSH keys
 
@@ -242,7 +256,7 @@ Subject, key and validity of the DLPoD server certificate, signed by the signing
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `aws_object_unique_prefix` | `"netskope"` | Unique prefix for the names of all AWS resources (Name tags and name attributes). Lowercase letters, digits and hyphens, 1-20 characters. Must not start with `aws` or `ssm` (reserved by SSM Parameter Store, and the prefix is used in the readiness parameter names). |
+| `aws_object_unique_prefix` | `"mylab-01"` | Unique prefix for the names of all AWS resources (Name tags and name attributes). Lowercase letters, digits and hyphens, 1-20 characters. Must not start with `aws` or `ssm` (reserved by SSM Parameter Store, and the prefix is used in the readiness parameter names). |
 | `aws_region` | `"us-east-1"` | AWS region to deploy all resources |
 | `vpc_cidr` | `"10.0.0.0/16"` | CIDR for the new VPC |
 | `public_subnet_cidr` | `"10.0.1.0/24"` | Public subnet — hosts the AIG (EIP) and NAT Gateway |
@@ -360,7 +374,7 @@ Logs: `sudo docker compose -f /opt/librechat/docker-compose.yml logs -f nginx li
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `aig_netskope_name` | `"aig-lab"` | AIG display name in Netskope tenant (1–15 characters) |
+| `aig_netskope_name` | `"aig-01"` | AIG display name in Netskope tenant (1–15 characters) |
 | `secret_name` | `aig/<aws_object_unique_prefix>/bootstrap` | Secrets Manager secret name. Must start with `aig/`. Set only to override the default. |
 
 ### AIG — EC2
@@ -381,13 +395,13 @@ Logs: `sudo docker compose -f /opt/librechat/docker-compose.yml logs -f nginx li
 | `guardrails_private_ip` | `"10.0.2.10"` | Fixed private IP — embedded in AIG bootstrap secret at plan time; do not change after apply |
 | `guardrails_llm_image_s3_bucket` | `""` | S3 bucket containing `aisecurity-llm.tgz`. **Required when `guardrails_ami_id` is empty**; with a custom AMI that ships the image it is optional (fallback only). |
 | `guardrails_llm_image_s3_key` | `"aisecurity-llm.tgz"` | S3 object key for the Guardrails image tarball |
-| `guardrails_ami_id` | `""` | Custom Guardrails AMI (Ubuntu-based, with NVIDIA driver, container toolkit, Docker and the LLM image). Out-of-date components are upgraded at first boot. Empty = stock Ubuntu 22.04, install everything at boot. `volume_size_gb` must be ≥ the AMI's root snapshot size. |
+| `guardrails_ami_id` | `""` | Custom Guardrails AMI (Ubuntu-based, with NVIDIA driver, container toolkit, Docker and the LLM image). Out-of-date components are upgraded at first boot. Empty = stock Ubuntu 24.04, install everything at boot. `volume_size_gb` must be ≥ the AMI's root snapshot size. |
 
 ### DLPoD
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `dlpod_ami_id` | `"ami-0b3a14615c7e7944e"` | DLPoD AMI — default is us-west-1; update for other regions |
+| `dlpod_ami_id` | `"ami-0dc05a852535f0ab4"` | DLPoD AMI — default is us-east-1; update for other regions |
 | `dlpod_instance_type` | `"c5d.4xlarge"` | DLPoD EC2 instance type |
 | `dlpod_private_ip` | `"10.0.2.20"` | Fixed private IP — embedded in AIG bootstrap secret at plan time; do not change after apply |
 | `dlpod_persona` | `"dlp-on-demand"` | DLPoD persona (`dlp-on-demand` or `dspm`) |
@@ -471,8 +485,7 @@ The timings below are for a pre-built Guardrails VM.
 Terraform state for this template contains TLS private keys (the lab root CA and the DLPoD leaf certificate) in plaintext. Use S3 remote state with encryption at rest.
 
 ```bash
-cp backend.hcl.example backend.hcl
-# Edit backend.hcl — fill in your S3 bucket, region, and KMS key
+# Create backend.hcl from the example in docs/deployment.md — S3 bucket, key, region and KMS key
 terraform init -backend-config=backend.hcl
 ```
 
@@ -482,77 +495,7 @@ See [docs/deployment.md](docs/deployment.md) for the full backend configuration 
 
 ## Minimum AWS permissions
 
-The IAM identity running `terraform apply` needs permissions across several services. No S3 permissions are required for the Guardrails image bucket — that access is granted to the Guardrails EC2 instance role, not the Terraform operator.
-
-The optional Windows 11 VM (`enable_win11_vm`) and LibreChat instance (`enable_librechat`) need no actions beyond those listed below. They use the same EC2 actions (instances, Elastic IPs, security groups and rules), the same IAM role and instance profile actions, and the same Secrets Manager actions. The only new name to allow is the LibreChat TLS secret, `aig/<aws_object_unique_prefix>/librechat-tls`, which falls under the `aig/*` scope the other secrets use. Neither instance needs extra permissions on the Terraform side for Bedrock or other services, because LibreChat is not given any.
-
-### EC2
-
-```
-ec2:Describe*
-ec2:AllocateAddress / ReleaseAddress / AssociateAddress / DisassociateAddress
-ec2:CreateVpc / DeleteVpc / ModifyVpcAttribute
-ec2:CreateSubnet / DeleteSubnet / ModifySubnetAttribute
-ec2:CreateInternetGateway / DeleteInternetGateway / AttachInternetGateway / DetachInternetGateway
-ec2:CreateNatGateway / DeleteNatGateway
-ec2:CreateRouteTable / DeleteRouteTable / AssociateRouteTable / DisassociateRouteTable / CreateRoute / DeleteRoute
-ec2:CreateSecurityGroup / DeleteSecurityGroup
-ec2:AuthorizeSecurityGroupIngress / AuthorizeSecurityGroupEgress
-ec2:RevokeSecurityGroupIngress / RevokeSecurityGroupEgress
-ec2:RunInstances / TerminateInstances / StopInstances
-ec2:CreateVpcEndpoint / DeleteVpcEndpoints / ModifyVpcEndpoint
-ec2:CreateTags / DeleteTags
-```
-
-### IAM
-
-```
-iam:CreateRole / DeleteRole / GetRole
-iam:CreateInstanceProfile / DeleteInstanceProfile / GetInstanceProfile
-iam:AddRoleToInstanceProfile / RemoveRoleFromInstanceProfile
-iam:PutRolePolicy / DeleteRolePolicy / GetRolePolicy / ListRolePolicies
-iam:AttachRolePolicy / DetachRolePolicy / ListAttachedRolePolicies  ← AmazonSSMManagedInstanceCore for Guardrails
-iam:PassRole  (scoped to ec2.amazonaws.com)
-```
-
-### Secrets Manager
-
-```
-secretsmanager:CreateSecret / DeleteSecret / DescribeSecret
-secretsmanager:GetSecretValue / PutSecretValue / TagResource
-```
-
-All the secrets this template creates are named `aig/<aws_object_unique_prefix>/…`: `bootstrap`, `ssh-private-key`, `ca-key`, `ca-cert` and, with LibreChat, `librechat-tls`. Scope these actions to `arn:aws:secretsmanager:<region>:<account>:secret:aig/*`. The EC2 instances' own roles are scoped to the individual secrets by Terraform.
-
-### SSM
-
-```
-ssm:PutParameter / GetParameter / DeleteParameter   ← Guardrails and AIG readiness gates
-ssm:DescribeParameters / ListTagsForResource        ← aws_ssm_parameter.aig_ready (Terraform refresh)
-ssm:SendCommand / GetCommandInvocation              ← DLPoD readiness gate (polls via the bastion)
-ssm:DescribeInstanceInformation
-```
-
-### CloudWatch Logs
-
-```
-logs:CreateLogGroup / DeleteLogGroup / DescribeLogGroups
-logs:PutRetentionPolicy
-```
-
-### Route 53
-
-```
-route53:CreateHostedZone / DeleteHostedZone / GetHostedZone / ListHostedZones
-route53:ChangeResourceRecordSets / ListResourceRecordSets
-```
-
-### Remote state (optional — recommended)
-
-```
-s3:GetObject / PutObject / DeleteObject   on your tfstate bucket
-dynamodb:GetItem / PutItem / DeleteItem   on your lock table (if using DynamoDB locking)
-```
+The IAM identity running `terraform apply` needs permissions across EC2, IAM, Secrets Manager, SSM, CloudWatch Logs and Route 53. The full list, resource scoping, and the extra permissions needed for the optional bastion, Windows 11 VM and LibreChat are in [docs/iam-permissions.md](docs/iam-permissions.md).
 
 ---
 
@@ -583,6 +526,8 @@ dynamodb:GetItem / PutItem / DeleteItem   on your lock table (if using DynamoDB 
 | Doc | Contents |
 |-----|----------|
 | [docs/deployment.md](docs/deployment.md) | Remote state setup (S3 backend with KMS encryption) |
+| [docs/iam-permissions.md](docs/iam-permissions.md) | AWS permissions the Terraform operator needs |
+| [CLAUDE.md](CLAUDE.md) | Guided deployment checklist for Claude Code |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Diagnostic commands, common failure modes, rebuild procedures |
 | [docs/devops.md](docs/devops.md) | AWS service choices, bootstrap internals, AIG→DLPoD TLS validation, CI/CD integration |
 
@@ -592,11 +537,11 @@ dynamodb:GetItem / PutItem / DeleteItem   on your lock table (if using DynamoDB 
 
 | Output | Description |
 |--------|-------------|
-| `aig_public_ip` | Elastic IP — configure AI clients to proxy through this on port 443 |
-| `aig_instance_id` | EC2 instance ID of the AIG |
+| `aig_aws_eip_public_ip` | Elastic IP — configure AI clients to proxy through this on port 443 |
+| `aig_aws_instance_id` | EC2 instance ID of the AIG |
 | `aig_fqdn` | AWS-generated public DNS name of the AIG's Elastic IP (the AIG certificate CN) |
 | `guardrails_ssm_connect_command` | SSM Session Manager connect command for the Guardrails instance |
-| `dlp_host` | DLP host URL configured in the AIG bootstrap (`https://dlp.aig.internal`) |
+| `dlp_host_url` | DLP host URL configured in the AIG bootstrap (`https://dlp.aig.internal` by default) |
 | `nat_gateway_ip` | Outbound IP for the private subnet — add to firewall allowlists if needed |
 | `librechat_url` | HTTPS URL of the optional LibreChat instance (the Elastic IP's public DNS name, which the certificate names). Null unless `enable_librechat` is true |
 | `win11_public_ip` | Elastic IP of the optional Windows 11 VM — RDP to this address. Null unless `enable_win11_vm` is true |

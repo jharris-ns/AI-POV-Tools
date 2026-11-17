@@ -14,7 +14,7 @@ Deploys the complete Netskope AI Services stack — AI Gateway, AI Guardrails GP
 
 | Option | Directory | Best for |
 |--------|-----------|---------|
-| [New VPC — public AIG](ai-services-all/new-vpc-public/README.md) | `ai-services-all/new-vpc-public/` | Starting from scratch; full stack in a new VPC, AIG with public Elastic IP |
+| [New VPC — public AIG](ai-services-all/new-vpc-public-v5/README.md) | `ai-services-all/new-vpc-public-v5/` | Starting from scratch; full stack in a new VPC, AIG with public Elastic IP |
 
 **This is the recommended template for a full-stack POV.** It deploys everything in one apply with readiness gates and the AIG↔DLPoD DNS/TLS wiring done for you. Use the individual module templates below only when a single component is needed, or when the combined stack is not wanted and the components are to be deployed one at a time — in that case follow the order in [`STAGED-BUILD.md`](STAGED-BUILD.md).
 
@@ -81,7 +81,7 @@ AI-POV-Tools/
     preflight.sh                 # Readiness checks for a template directory
     curate.sh                    # Build a customer package (Netskope SEs)
   ai-services-all/
-    new-vpc-public/               # Full stack: AIG (public EIP) + Guardrails + DLPoD in one apply
+    new-vpc-public-v5/            # Full stack: AIG (public EIP) + Guardrails + DLPoD in one apply
   aig/                            # AI Gateway Terraform templates
     README.md                     # AIG overview and template selection guide
     deployment-role/              # Run once: least-privilege IAM role for deployment
