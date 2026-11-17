@@ -55,12 +55,12 @@ variable "aws_tag_owner" {
 }
 
 variable "aws_tag_purpose" {
-  description = "Purpose of this deployment: core, pov, demo, lab, or integration. Applied as the 'purpose' tag."
+  description = "Purpose of this deployment. Recommended values: prod, dev, test, lab, pov, demo, integration, core. Applied as the 'purpose' tag. Letters, numbers, spaces and _ . : / = + - @ only, up to 256 characters."
   type        = string
 
   validation {
-    condition     = contains(["core", "pov", "demo", "lab", "integration"], var.aws_tag_purpose)
-    error_message = "aws_tag_purpose must be one of: core, pov, demo, lab, integration."
+    condition     = can(regex("^[\\p{L}\\p{Z}\\p{N}_.:/=+@-]{0,256}$", var.aws_tag_purpose))
+    error_message = "aws_tag_purpose may contain only letters, numbers, spaces and _ . : / = + - @, up to 256 characters."
   }
 }
 

@@ -23,12 +23,12 @@ locals {
 #
 # The appliance is registered with the AIG's Elastic IP before the EC2 instance
 # is created — the enrollment token depends on the appliance ID, which in turn
-# depends on the known public IP. The instance self-enrolls at first boot by
+# depends on the known public DNS FQDN. The instance self-enrolls at first boot by
 # reading the bootstrap secret.
 
 resource "netskope_aig_appliance" "this" {
   name = var.aig_netskope_name
-  host = aws_eip.aig.public_ip
+  host = aws_eip.aig.public_dns
 
   ports = {
     https = { enable = true, port = 443 }
