@@ -61,9 +61,15 @@ resource "tls_locally_signed_cert" "dlpod" {
 }
 
 # Write the DLPoD server certificate (public, no key) next to the module so it
-# can be inspected or imported elsewhere.
+# can be inspected or imported elsewhere. The file name carries the unique prefix,
+# like the other generated files (<prefix>-keypair.pem, <prefix>-root-ca-cert.pem);
+# the bastion stores the same certificate under the same name.
+locals {
+  dlpod_cert_file_name = "${var.aws_object_unique_prefix}-dlpod-cert.pem"
+}
+
 resource "local_file" "dlpod_cert" {
-  filename        = "${path.module}/${var.dlpod_hostname}-cert.pem"
+  filename        = "${path.module}/${local.dlpod_cert_file_name}"
   content         = tls_locally_signed_cert.dlpod.cert_pem
   file_permission = "0644"
 }
@@ -81,9 +87,11 @@ locals {
       licensekey = var.netskope_onpremappliance_licensekey
     },
     var.dlpod_hostname != "" ? { hostname = var.dlpod_hostname } : {},
-    var.dlpod_ssh_public_key != "" ? {
-      ssh-public-keys = [{ key = var.dlpod_ssh_public_key, user = "nsadmin" }]
-    } : {}
+    {
+      # DLPoD does not use EC2 key injection, so the public half of the DLPoD
+      # key pair (dlpod_key_pair_name, or the new <prefix>-keypair) goes in here.
+      ssh-public-keys = [{ key = local.dlpod_ssh_public_key, user = "nsadmin" }]
+    }
   )
 
   dlpod_bootstrap = {

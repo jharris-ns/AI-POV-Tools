@@ -70,7 +70,7 @@ resource "aws_secretsmanager_secret_version" "aig_bootstrap" {
       host = local.guardrails_host
     }
     dlp = {
-      certificate = tls_locally_signed_cert.dlpod.cert_pem
+      certificate = data.local_file.ca_cert.content
       host        = "https://${var.dlpod_hostname}"
     }
   })

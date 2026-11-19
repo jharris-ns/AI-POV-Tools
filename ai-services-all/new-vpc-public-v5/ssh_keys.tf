@@ -5,7 +5,8 @@
 # (and optionally Guardrails and DLPoD):
 #
 #   - keypair_existing_private_key_local_path = ""  → a private key is generated
-#     and written to my-private-key.pem in the project root directory.
+#     and written to <aws_object_unique_prefix>-keypair.pem in the project root
+#     directory (the same name the bastion downloads it under).
 #   - keypair_existing_private_key_local_path = "<path>" → that private key is
 #     used. A path that does not exist, or a file that is not a valid private
 #     key, fails the plan.
@@ -20,7 +21,7 @@
 
 locals {
   use_existing_private_key   = var.keypair_existing_private_key_local_path != ""
-  generated_private_key_path = "${path.module}/my-private-key.pem"
+  generated_private_key_path = "${path.module}/${local.keypair_name}.pem"
 
   keypair_name        = "${var.aws_object_unique_prefix}-keypair"
   ssh_key_secret_name = "aig/${var.aws_object_unique_prefix}/ssh-private-key"
@@ -86,7 +87,18 @@ data "aws_key_pair" "override" {
     var.librechat_key_pair_name,
   ]))
 
-  key_name = each.value
+  key_name           = each.value
+  include_public_key = true
+
+  # The DLPoD bootstrap injects this key into nsadmin (DLPoD ignores EC2 key
+  # injection), so a key pair without retrievable public key material would
+  # silently leave the appliance with no SSH access.
+  lifecycle {
+    postcondition {
+      condition     = self.public_key != ""
+      error_message = "EC2 returned no public key material for key pair ${each.value}. DLPoD needs it for SSH access; use a key pair that exposes its public key, or leave the *_key_pair_name blank."
+    }
+  }
 }
 
 locals {
@@ -96,6 +108,11 @@ locals {
   dlpod_key_pair_name      = var.dlpod_key_pair_name != "" ? data.aws_key_pair.override[var.dlpod_key_pair_name].key_name : aws_key_pair.this.key_name
   win11_key_pair_name      = var.win11_key_pair_name != "" ? data.aws_key_pair.override[var.win11_key_pair_name].key_name : aws_key_pair.this.key_name
   librechat_key_pair_name  = var.librechat_key_pair_name != "" ? data.aws_key_pair.override[var.librechat_key_pair_name].key_name : aws_key_pair.this.key_name
+
+  # Public key for the DLPoD key pair, injected into nsadmin by the bootstrap.
+  dlpod_ssh_public_key = trimspace(
+    var.dlpod_key_pair_name != "" ? data.aws_key_pair.override[var.dlpod_key_pair_name].public_key : aws_key_pair.this.public_key
+  )
 }
 
 # ── Secrets Manager: private key for the bastion ──────────────────────────────
