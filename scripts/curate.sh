@@ -9,7 +9,7 @@
 #
 #   --customer      Short filesystem-safe name. Required.
 #   --modules       Comma-separated Terraform roots to include. Required. Valid values:
-#                     ai-services-all/new-vpc-public
+#                     ai-services-all/new-vpc-public-v5
 #                     aig/existing-vpc  aig/new-vpc-public  aig/new-vpc-private
 #                     gpu-guardrails/existing-vpc  gpu-guardrails/new-vpc-private
 #                     dlpod/existing-vpc  dlpod/new-vpc-private
@@ -57,7 +57,7 @@ done
 [[ "$CUSTOMER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "ERROR: --customer must be filesystem-safe ([A-Za-z0-9._-])." >&2; exit 1; }
 
 VALID_MODULES=(
-  ai-services-all/new-vpc-public
+  ai-services-all/new-vpc-public-v5
   aig/existing-vpc aig/new-vpc-public aig/new-vpc-private
   gpu-guardrails/existing-vpc gpu-guardrails/new-vpc-private
   dlpod/existing-vpc dlpod/new-vpc-private
@@ -164,11 +164,11 @@ if [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]]; then
 fi
 if [[ $HAS_ALL -eq 1 ]]; then
   copy ai-services-all/README.md; note "ai-services-all/README.md"
-  [[ -f ai-services-all/new-vpc-public/CLAUDE.md ]] && { cp ai-services-all/new-vpc-public/CLAUDE.md "$PKG/ai-services-all/new-vpc-public/"; note "ai-services-all/new-vpc-public/CLAUDE.md"; }
+  [[ -f ai-services-all/new-vpc-public-v5/CLAUDE.md ]] && { cp ai-services-all/new-vpc-public-v5/CLAUDE.md "$PKG/ai-services-all/new-vpc-public-v5/"; note "ai-services-all/new-vpc-public-v5/CLAUDE.md"; }
 elif [[ $HAS_GR -eq 1 || $HAS_DLP -eq 1 ]]; then
   # The combined-stack troubleshooting guide is the only Guardrails/DLPoD diagnostic doc.
-  mkdir -p "$PKG/ai-services-all/new-vpc-public/docs"
-  cp ai-services-all/new-vpc-public/docs/troubleshooting.md "$PKG/ai-services-all/new-vpc-public/docs/"; note "ai-services-all/new-vpc-public/docs/troubleshooting.md"
+  mkdir -p "$PKG/ai-services-all/new-vpc-public-v5/docs"
+  cp ai-services-all/new-vpc-public-v5/docs/troubleshooting.md "$PKG/ai-services-all/new-vpc-public-v5/docs/"; note "ai-services-all/new-vpc-public-v5/docs/troubleshooting.md"
   if (( HAS_AIG + HAS_GR + HAS_DLP > 1 )); then cp STAGED-BUILD.md "$PKG/"; note "STAGED-BUILD.md"; fi
 fi
 
@@ -209,7 +209,7 @@ done
     echo
     echo "## Staged build order"
     echo
-    echo "This package was prepared for deploying one component at a time (the combined \`ai-services-all/new-vpc-public/\` stack was not selected). Deploy all stages into the same VPC: the first stage creates it (\`new-vpc-private/\`); later stages join it (\`existing-vpc/\`)."
+    echo "This package was prepared for deploying one component at a time (the combined \`ai-services-all/new-vpc-public-v5/\` stack was not selected). Deploy all stages into the same VPC: the first stage creates it (\`new-vpc-private/\`); later stages join it (\`existing-vpc/\`)."
     echo
     echo '```'
     n=1
@@ -227,10 +227,10 @@ done
   [[ $HAS_AIG -eq 1 || $HAS_ALL -eq 1 ]] && echo "- AIG AMI ID — subscribe to Netskope AI Gateway on AWS Marketplace; the ID is region-specific"
   [[ $HAS_AIG -eq 1 || $HAS_ALL -eq 1 ]] && echo "- Netskope REST API v2 token and tenant URL — set as \`NETSKOPE_API_KEY\` / \`NETSKOPE_SERVER_URL\` environment variables, never in a file"
   [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]] && echo "- DLPoD AMI ID — from Netskope; region-specific"
-  [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]] && echo "- DLPoD license key — set as \`TF_VAR_dlpod_licensekey\`"
+  [[ $HAS_DLP -eq 1 || $HAS_ALL -eq 1 ]] && echo "- DLPoD license key — set as \`TF_VAR_$([[ $HAS_ALL -eq 1 ]] && echo netskope_onpremappliance_licensekey || echo dlpod_licensekey)\`"
   [[ $HAS_GR -eq 1  || $HAS_ALL -eq 1 ]] && echo "- The Guardrails image \`aisecurity-llm.tgz\` uploaded to an S3 bucket in the target region"
   [[ $HAS_GR -eq 1  || $HAS_ALL -eq 1 ]] && echo "- EC2 quota for G-family GPU instances (≥ 4 vCPUs for \`g4dn.xlarge\`)"
-  echo "- Terraform ≥ 1.5, AWS CLI with a configured profile, EC2 key pair(s) in the target region"
+  echo "- Terraform ≥ $([[ $HAS_ALL -eq 1 ]] && echo 1.9 || echo 1.5), AWS CLI with a configured profile (select it with \`AWS_PROFILE\`), EC2 key pair(s) in the target region"
   echo
   echo "## Support"
   echo

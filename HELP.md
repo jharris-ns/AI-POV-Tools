@@ -5,7 +5,7 @@ questions in plain language and points you to the right guide. For the
 module overview see [`README.md`](README.md).
 
 **If you only read one line:** for a full POV, use
-[`ai-services-all/new-vpc-public/`](ai-services-all/new-vpc-public/README.md).
+[`ai-services-all/new-vpc-public-v5/`](ai-services-all/new-vpc-public-v5/README.md).
 It installs the AI Gateway, AI Guardrails and DLP On-Demand together with one
 command and wires them to each other.
 
@@ -25,7 +25,7 @@ Answer these three questions in order.
 
 **1. Do you want all three components (AI Gateway + Guardrails + DLPoD)?**
 
-- **Yes** → `ai-services-all/new-vpc-public/`. You're done — skip to
+- **Yes** → `ai-services-all/new-vpc-public-v5/`. You're done — skip to
   […check I have everything](#check-i-have-everything-before-i-start).
 - **Just one** → go to question 2.
 - **All three, but the customer insists on installing them one at a time** →
@@ -55,7 +55,7 @@ they prove very little — an AIG is almost always part of the picture.
 The same decision as a picture:
 
 ```
-All three components? ── yes ──► ai-services-all/new-vpc-public/
+All three components? ── yes ──► ai-services-all/new-vpc-public-v5/
         │
         no
         ▼
@@ -122,7 +122,9 @@ Put secrets in environment variables, never in files:
 ```bash
 export NETSKOPE_SERVER_URL="https://<tenant>.goskope.com/api/v2"
 export NETSKOPE_API_KEY="<rest-api-v2-token>"
-export TF_VAR_dlpod_licensekey="<license>"   # any template that deploys DLPoD
+export TF_VAR_dlpod_licensekey="<license>"   # standalone dlpod/ templates
+# The combined stack (ai-services-all/new-vpc-public-v5/) names it differently:
+export TF_VAR_netskope_onpremappliance_licensekey="<license>"
 ```
 
 Why: anything you type into `terraform.tfvars` is copied into
@@ -166,7 +168,7 @@ Cloud Platform → AI Gateways**, select the appliance, add the customer's AI
 providers, then point a test client at `https://<aig public or private ip>:443`
 and send a prompt. It should show up in the tenant's AI Gateway activity with
 the Guardrails and DLP verdicts. Step-by-step:
-[`ai-services-all/new-vpc-public/README.md`](ai-services-all/new-vpc-public/README.md) §First test.
+[`ai-services-all/new-vpc-public-v5/README.md`](ai-services-all/new-vpc-public-v5/README.md) §First test.
 Client-side proxy/SDK settings depend on the customer's tools — ask your SE.
 
 ### …fix something
@@ -174,7 +176,7 @@ Client-side proxy/SDK settings depend on the customer's tools — ask your SE.
 | Symptom | Guide |
 |---------|-------|
 | AIG shows Disconnected / never enrolls / token expired / provider auth error | [`aig/docs/troubleshooting.md`](aig/docs/troubleshooting.md) |
-| Guardrails Phase 1 or 2 stalled, health check failing, SSM readiness stale | [`ai-services-all/new-vpc-public/docs/troubleshooting.md`](ai-services-all/new-vpc-public/docs/troubleshooting.md) §Guardrails |
+| Guardrails Phase 1 or 2 stalled, health check failing, SSM readiness stale | [`ai-services-all/new-vpc-public-v5/docs/troubleshooting.md`](ai-services-all/new-vpc-public-v5/docs/troubleshooting.md) §Guardrails |
 | DLPoD bootstrap not applied, TLS errors, AIG cannot reach DLPoD | same guide, §DLPoD; and [`dlpod/docs/ztp-bootstrap-reference.md`](dlpod/docs/ztp-bootstrap-reference.md) §Known issues |
 | `terraform destroy` hangs on subnet/VPC | same guide (VPC endpoint ENIs) |
 | Access denied during apply | [`aig/docs/iam-permissions.md`](aig/docs/iam-permissions.md) — name prefixes must match |
@@ -195,7 +197,7 @@ and stay. `/pov-teardown` walks through it.
 - AIG bootstrap via Secrets Manager: [`aig/README.md`](aig/README.md) §Bootstrap process
 - DLPoD zero-touch provisioning and `bootstrap.json` schema: [`dlpod/docs/ztp-bootstrap-reference.md`](dlpod/docs/ztp-bootstrap-reference.md)
 - Guardrails two-phase boot: [`gpu-guardrails/README.md`](gpu-guardrails/README.md) §Setup process
-- Combined stack internals, TLS validation, CI/CD: [`ai-services-all/new-vpc-public/docs/devops.md`](ai-services-all/new-vpc-public/docs/devops.md)
+- Combined stack internals, TLS validation, CI/CD: [`ai-services-all/new-vpc-public-v5/docs/devops.md`](ai-services-all/new-vpc-public-v5/docs/devops.md)
 - Design decisions and constraints per module: the `CLAUDE.md` in each module folder (written for Claude, readable by humans)
 
 ### …run the tests
@@ -210,7 +212,7 @@ destroy real infrastructure. `dlpod/new-vpc-private/tests/` has a
 Run `/pov-curate` in Claude Code, or directly:
 
 ```bash
-scripts/curate.sh --customer acme --modules ai-services-all/new-vpc-public --region us-east-1 --zip
+scripts/curate.sh --customer acme --modules ai-services-all/new-vpc-public-v5 --region us-east-1 --zip
 ```
 
 Output goes to `dist/acme-<date>/` with a `MANIFEST.md` listing what was
@@ -284,7 +286,7 @@ name. Fine for a POV; change it for production.
 | **AIG / AIGW** | Netskope AI Gateway — the appliance that proxies AI traffic and applies policy |
 | **AI Guardrails** | LLM-based content inspection service the AIG calls; runs on a GPU instance |
 | **DLPoD** | DLP On-Demand — Netskope data loss prevention inspection appliance |
-| **Combined stack** | `ai-services-all/new-vpc-public/` — all three components in one apply; the recommended path |
+| **Combined stack** | `ai-services-all/new-vpc-public-v5/` — all three components in one apply; the recommended path |
 | **Staged build** | The fallback: installing Guardrails, DLPoD and AIG as three separate Terraform runs into one VPC, in that order |
 | **ZTP** | Zero-touch provisioning — DLPoD configures itself from `bootstrap.json` in EC2 user-data |
 | **Bootstrap secret** | Secrets Manager JSON the AIG reads once at first boot; contains the enrollment token and optional `dlp` / `ai_guardrails` blocks |

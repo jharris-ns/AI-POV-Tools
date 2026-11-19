@@ -49,7 +49,7 @@ Send them to the `ssm_connect_command` output and the two log files.
   `ssm`, `ssmmessages`, `ec2messages`, `logs` and a Gateway endpoint for S3
   so the private instance works without the NAT for AWS APIs. These
   endpoint ENIs are also why `terraform destroy` can hang on subnet
-  deletion — see `ai-services-all/new-vpc-public/docs/troubleshooting.md`.
+  deletion — see `ai-services-all/new-vpc-public-v5/docs/troubleshooting.md`.
 - **Least-privilege S3.** The instance role can `GetObject` only on
   `s3://<image_s3_bucket>/<image_s3_key>`. Wrong bucket or key in tfvars
   = Phase 2 fails at download, not at plan.
@@ -71,7 +71,7 @@ instead passed as `guardrails_host` to `aig/existing-vpc/`.
 ## Staged build role
 
 A staged build is the fallback when the customer does not want the combined
-`ai-services-all/new-vpc-public/` stack and prefers one component at a time.
+`ai-services-all/new-vpc-public-v5/` stack and prefers one component at a time.
 In that case `new-vpc-private/` is **Stage 1**: it
 creates the VPC, and `dlpod/existing-vpc/` then `aig/existing-vpc/` join it.
 Its outputs `vpc_id`, `private_subnet_id`, `vpc_cidr`, `private_subnet_cidr`
