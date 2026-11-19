@@ -541,6 +541,7 @@ The IAM identity running `terraform apply` needs permissions across EC2, IAM, Se
 | `aig_aws_instance_id` | EC2 instance ID of the AIG |
 | `aig_fqdn` | AWS-generated public DNS name of the AIG's Elastic IP (the AIG certificate CN) |
 | `guardrails_ssm_connect_command` | SSM Session Manager connect command for the Guardrails instance |
+| `bastion_ssm_connect_command` | SSM Session Manager connect command for the bastion. Null unless `enable_bastion` is true |
 | `dlp_host_url` | DLP host URL configured in the AIG bootstrap (`https://dlp.aig.internal` by default) |
 | `nat_gateway_ip` | Outbound IP for the private subnet — add to firewall allowlists if needed |
 | `librechat_url` | HTTPS URL of the optional LibreChat instance (the Elastic IP's public DNS name, which the certificate names). Null unless `enable_librechat` is true |
