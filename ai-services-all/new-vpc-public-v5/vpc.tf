@@ -189,7 +189,7 @@ resource "aws_vpc_endpoint" "logs" {
 # The AIG validates DLP TLS against the hostname in dlp.host. A bare-IP URL
 # (https://10.0.2.20) causes Go's TLS stack to verify against an empty string
 # rather than the IP SAN, producing:
-#   x509: certificate is valid for dlp.aig.internal, not
+#   x509: certificate is valid for dlpod.aig.internal, not
 # A private hosted zone resolves var.dlpod_hostname to the DLPoD private IP
 # so the AIG connects by name and the DNS SAN matches correctly.
 

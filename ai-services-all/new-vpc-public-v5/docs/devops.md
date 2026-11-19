@@ -23,7 +23,7 @@
 | Internet Gateway | Required for public subnet routing |
 | VPC Endpoints (Interface) | SSM, SSMMessages, EC2Messages, CloudWatch Logs — keep management traffic on the AWS backbone, avoids NAT Gateway charges and latency for control plane operations |
 | VPC Endpoint (Gateway) | S3 — free, keeps Guardrails image download (~10 GB) off the NAT Gateway entirely |
-| Route 53 Private Hosted Zone | Resolves `dlp.aig.internal` → DLPoD private IP within the VPC. Required because the AIG's Go TLS stack cannot verify certificates when connecting to a bare IP URL — it must connect by hostname |
+| Route 53 Private Hosted Zone | Resolves `dlpod.aig.internal` → DLPoD private IP within the VPC. Required because the AIG's Go TLS stack cannot verify certificates when connecting to a bare IP URL — it must connect by hostname |
 
 ### IAM
 
@@ -54,7 +54,7 @@ The AIG bootstrap secret (`aig/<aws_object_unique_prefix>/bootstrap` by default)
   },
   "dlp": {
     "certificate": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
-    "host": "https://dlp.aig.internal"
+    "host": "https://dlpod.aig.internal"
   }
 }
 ```
@@ -72,7 +72,7 @@ DLPoD uses a root-and-leaf hierarchy (no intermediate CA). The root is the lab r
 ```
 lab root CA (CA:TRUE; openssl-generated or supplied via ca_existing_signing_key_local_path)
     └── tls_locally_signed_cert.dlpod (CA:FALSE, server_auth)
-            SANs: DNS:dlp.aig.internal, IP:10.0.2.20
+            SANs: DNS:dlpod.aig.internal, IP:10.0.2.20
 ```
 
 **Why a separate leaf:** DLPoD rejects CA:TRUE certificates in the `dlpaas.server-cert` field. The leaf cert must be signed by the CA, not self-signed.
@@ -87,25 +87,23 @@ lab root CA (CA:TRUE; openssl-generated or supplied via ca_existing_signing_key_
 
 #### Certificate generation (Terraform apply — before any EC2 is created)
 
-The DLPoD server certificate is signed within Terraform by the lab root CA from `ca.tf` (generated locally with `openssl` unless `ca_existing_signing_key_local_path` is set). The AIG is given the DLPoD leaf certificate itself (`tls_locally_signed_cert.dlpod.cert_pem`) as `dlp.certificate`, and the same PEM is written to `<dlpod_hostname>-cert.pem` in this directory (`local_file.dlpod_cert`, default `dlp.aig.internal-cert.pem`, gitignored via `*.pem`).
+The DLPoD server certificate is signed within Terraform by the lab root CA from `ca.tf` (generated locally with `openssl` unless `ca_existing_signing_key_local_path` is set). The CA certificate is the trust anchor the AIG uses to verify DLPoD (`dlp.certificate`). The signed leaf is also written to `<aws_object_unique_prefix>-dlpod-cert.pem` in this directory (`local_file.dlpod_cert`, gitignored via `*.pem`).
 
 1. **`tls_private_key.dlpod`** — generates the RSA private key for the DLPoD server (`dlpod_cert_rsa_bits`, default 2048)
 2. **`tls_cert_request.dlpod`** — creates a CSR with:
-   - `CN = var.dlpod_cert_common_name` (default: `var.dlpod_hostname`, itself `dlp.aig.internal` by default)
+   - `CN = var.dlpod_cert_common_name` (default: `var.dlpod_hostname`, itself `dlpod.aig.internal` by default)
    - optional O, OU, C, ST, L from the `dlpod_cert_*` variables
-   - `DNS SAN = dlp.aig.internal` (var.dlpod_hostname)
+   - `DNS SAN = dlpod.aig.internal` (var.dlpod_hostname)
    - `IP SAN = 10.0.2.20` (var.dlpod_private_ip)
 3. **`tls_locally_signed_cert.dlpod`** — the lab root CA signs the CSR to produce the leaf server cert (`CA:FALSE`, `server_auth`) valid for `dlpod_cert_validity_period_days` (default 90)
-4. **`local_file.dlpod_cert`** — writes the leaf cert (public, no key) to `<dlpod_hostname>-cert.pem` in this directory, for inspection or import elsewhere
+4. **`local_file.dlpod_cert`** — writes the leaf cert (public, no key) to `<aws_object_unique_prefix>-dlpod-cert.pem` in this directory, for inspection or import elsewhere
 
-The leaf cert PEM has two consumers:
+The CA cert PEM is split across two consumers:
 - → `aws_secretsmanager_secret_version.aig_bootstrap` as `dlp.certificate` (AIG uses this to verify DLPoD's TLS)
-- → `local.dlpod_bootstrap.dlpaas.server-cert` (the cert DLPoD presents)
-
-The CA cert PEM goes to DLPoD only:
 - → `local.dlpod_bootstrap.dlpaas.server-intermediate-ca-chain` (DLPoD sends this in the TLS handshake)
 
-The private key goes only to DLPoD:
+The leaf cert and private key go only to DLPoD:
+- → `local.dlpod_bootstrap.dlpaas.server-cert` (leaf cert, `CA:FALSE`)
 - → `local.dlpod_bootstrap.dlpaas.server-key` (PKCS#8 private key)
 
 #### AIG provisioning sequence
@@ -120,12 +118,12 @@ The private key goes only to DLPoD:
      "enrollment_token": "<single-use token>",
      "ai_guardrails": { "host": "http://10.0.2.10:8080/invocations" },
      "dlp": {
-       "certificate": "-----BEGIN CERTIFICATE-----\n<DLPoD leaf cert PEM>\n-----END CERTIFICATE-----\n",
-       "host": "https://dlp.aig.internal"
+       "certificate": "-----BEGIN CERTIFICATE-----\n<CA cert PEM>\n-----END CERTIFICATE-----\n",
+       "host": "https://dlpod.aig.internal"
      }
    }
    ```
-   Note: `dlp.certificate` is the DLPoD **leaf cert** (`tls_locally_signed_cert.dlpod.cert_pem`), not the CA cert. The AIG uses it to verify the cert DLPoD presents. `dlp.host` uses the hostname (not bare IP) — see the AIG Validation section below.
+   Note: `dlp.certificate` is the **CA cert**, not the leaf cert. The AIG uses it as a trust anchor to verify the cert chain DLPoD presents. `dlp.host` uses the hostname (not bare IP) — see the AIG Validation section below.
 
 #### AIG first boot
 
@@ -181,7 +179,7 @@ DLPoD uses Netskope's `nsbootstrap.service` — a first-boot service that reads 
 | `persona` | `dlp-on-demand` | Activates DLP inspection mode |
 | `dns.primary` | VPC DNS resolver (`vpc_cidr + 2`) | Ensures DLPoD uses VPC DNS to resolve internal names |
 | `system.licensekey` | Netskope license key | Activates the appliance |
-| `system.hostname` | `dlp.aig.internal` | Sets appliance hostname |
+| `system.hostname` | `dlpod.aig.internal` | Sets appliance hostname |
 | `system.ssh-allowlist` | Public subnet CIDR | Restricts SSH access to the public subnet only |
 | `dlpaas.server-cert` | Leaf TLS cert (CA:FALSE) | The HTTPS certificate DLPoD presents |
 | `dlpaas.server-key` | Leaf private key (PKCS#8) | Private key for the TLS cert |
@@ -201,24 +199,24 @@ Note: IMDSv2 does not prevent processes running directly in the host network nam
 
 When the AIG enrolls and processes its bootstrap secret, it validates the DLPoD connection as follows:
 
-1. **Parse** `dlp.host` from the bootstrap secret → `https://dlp.aig.internal`
-2. **Resolve** `dlp.aig.internal` via VPC DNS → Route 53 private zone → `10.0.2.20`
+1. **Parse** `dlp.host` from the bootstrap secret → `https://dlpod.aig.internal`
+2. **Resolve** `dlpod.aig.internal` via VPC DNS → Route 53 private zone → `10.0.2.20`
 3. **Connect** to `10.0.2.20:443` via TCP
 4. **TLS handshake:** AIG presents no client cert; DLPoD presents its server cert chain
-5. **Certificate verification:** AIG uses `dlp.certificate` (the DLPoD leaf cert PEM) to verify the server cert
-   - Verifies the server cert matches the configured `dlp.certificate`
-   - Verifies the cert's DNS SAN includes `dlp.aig.internal` (the hostname from the URL)
+5. **Certificate verification:** AIG uses `dlp.certificate` (the CA cert PEM) as the trust anchor
+   - Verifies the server cert is signed by the CA
+   - Verifies the cert's DNS SAN includes `dlpod.aig.internal` (the hostname from the URL)
    - Verifies validity period
-6. **Probe request:** AIG sends a POST to `https://dlp.aig.internal/inspections/jobs`
+6. **Probe request:** AIG sends a POST to `https://dlpod.aig.internal/inspections/jobs`
 7. **Success:** DLPoD responds → AIG marks the DLP service as configured
 
 **Why the hostname matters:** The AIG is written in Go. Go's `crypto/tls` package verifies TLS certificates by extracting the host from the connection URL and checking it against the cert's SANs. When the host is a bare IP address (e.g. `https://10.0.2.20`), the AIG's URL parsing returns an empty hostname string for verification, causing the error:
 
 ```
-x509: certificate is valid for dlp.aig.internal, not
+x509: certificate is valid for dlpod.aig.internal, not
 ```
 
-This occurs even though the cert has a valid IP SAN (`IP Address:10.0.2.20`). Using `https://dlp.aig.internal` as the host causes Go to correctly verify against the DNS SAN, which succeeds.
+This occurs even though the cert has a valid IP SAN (`IP Address:10.0.2.20`). Using `https://dlpod.aig.internal` as the host causes Go to correctly verify against the DNS SAN, which succeeds.
 
 ---
 

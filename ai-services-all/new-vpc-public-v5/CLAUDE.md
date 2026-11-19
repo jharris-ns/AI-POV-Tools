@@ -14,7 +14,7 @@ This is v5 of the combined template. An older `new-vpc-public/` sibling may exis
 |-----------|--------|--------------|-------|
 | AIG | public | `c6a.4xlarge` | Elastic IP, HTTPS on 443 from `aig_allowed_cidr_blocks` |
 | AI Guardrails | private | `g4dn.xlarge` | GPU. Port 8080 inside the VPC |
-| DLPoD | private | `c5d.4xlarge` | TLS on 443, hostname `dlp.aig.internal` (`dlpod_hostname`) via a Route 53 private zone |
+| DLPoD | private | `c5d.4xlarge` | TLS on 443, hostname `dlpod.aig.internal` (`dlpod_hostname`) via a Route 53 private zone |
 | Bastion | public | `t3.small` | `enable_bastion`, default `true`. Signs and installs the AIG certificate, sets the AIG's DLP and Guardrails hosts, reports `aig-ready`. Do not disable it on a first deployment |
 | Windows 11 VM | public | `m5.xlarge` | `enable_win11_vm`, default `false`. Needs the user's own Windows 11 AMI |
 | LibreChat | public | `t3.medium` | `enable_librechat`, default `false`. Open registration; only the CIDR list restricts access |
@@ -133,9 +133,9 @@ Files Terraform writes to this directory, all gitignored and sensitive. Never pr
 
 | File | Contents |
 |------|----------|
-| `my-private-key.pem` | Generated SSH private key (unless `keypair_existing_private_key_local_path` is set) |
+| `<prefix>-keypair.pem` | Generated SSH private key (unless `keypair_existing_private_key_local_path` is set) |
 | `<prefix>-root-ca-key.pem`, `<prefix>-root-ca-cert.pem` | Lab root CA (unless `ca_existing_signing_*` are set). The cert is public; the key is not |
-| `<dlpod_hostname>-cert.pem` | DLPoD server certificate (public, no key), for example `dlp.aig.internal-cert.pem` |
+| `<prefix>-dlpod-cert.pem` | DLPoD server certificate (public, no key) |
 | `terraform.tfstate*` | Contains TLS private keys, the enrollment token and the license key |
 
 ---
@@ -157,7 +157,7 @@ Key outputs:
 | `aig_fqdn` | AWS public DNS name of that address; the CN of the AIG certificate |
 | `guardrails_ssm_connect_command` | Session Manager into the Guardrails instance |
 | `bastion_ssm_connect_command` | Session Manager into the bastion (null without the bastion) |
-| `dlp_host_url` | DLP host configured in the AIG, `https://dlp.aig.internal` by default |
+| `dlp_host_url` | DLP host configured in the AIG, `https://dlpod.aig.internal` by default |
 | `guardrails_health_check_url` | `http://<guardrails ip>:8080/ping`, reachable only from inside the VPC |
 | `nat_gateway_ip` | Outbound address of the private subnet, for firewall allowlists |
 | `librechat_url`, `win11_public_ip` | Only with the matching `enable_*` |

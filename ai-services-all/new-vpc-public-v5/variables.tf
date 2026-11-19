@@ -193,7 +193,7 @@ variable "netskope_onpremappliance_licensekey" {
 # Secrets Manager and downloaded by the bastion so it can SSH to the AIG.
 
 variable "keypair_existing_private_key_local_path" {
-  description = "Local path to an existing unencrypted SSH private key (PEM or OpenSSH format) to use for the new <aws_object_unique_prefix>-keypair AWS key pair. Leave blank to generate a private key locally, written to my-private-key.pem in the project root directory. A path that does not exist, or a file that is not a valid private key, fails the plan."
+  description = "Local path to an existing unencrypted SSH private key (PEM or OpenSSH format) to use for the new <aws_object_unique_prefix>-keypair AWS key pair. Leave blank to generate a private key locally, written to <aws_object_unique_prefix>-keypair.pem in the project root directory. A path that does not exist, or a file that is not a valid private key, fails the plan."
   type        = string
   default     = ""
   nullable    = false
@@ -233,7 +233,7 @@ variable "librechat_key_pair_name" {
 }
 
 variable "dlpod_key_pair_name" {
-  description = "Name of an existing AWS EC2 key pair to use for the DLPoD instance. Leave blank to use the new <aws_object_unique_prefix>-keypair. A non-blank value must name a key pair that already exists in aws_region."
+  description = "Name of an existing AWS EC2 key pair to use for the DLPoD instance. Leave blank to use the new <aws_object_unique_prefix>-keypair. A non-blank value must name a key pair that already exists in aws_region. DLPoD does not use EC2 key injection, so the public key of this key pair is injected into nsadmin via the bootstrap config."
   type        = string
   default     = ""
   nullable    = false
@@ -827,12 +827,6 @@ variable "dlpod_private_ip" {
   }
 }
 
-variable "dlpod_ssh_public_key" {
-  description = "SSH public key to inject into nsadmin on the DLPoD appliance via bootstrap. DLPoD does not use EC2 key injection — this must be set explicitly."
-  type        = string
-  default     = ""
-}
-
 variable "dlpod_persona" {
   description = "DLPoD appliance persona. Must be 'dlp-on-demand' or 'dspm'."
   type        = string
@@ -847,5 +841,5 @@ variable "dlpod_persona" {
 variable "dlpod_hostname" {
   description = "Hostname used as the DNS SAN (and, unless dlpod_cert_common_name is set, the CN) of the DLPoD server cert. The AIG connects to DLPoD by this hostname (https://<dlpod_hostname>) and verifies the TLS SAN against it; a Route 53 private zone resolves it to dlpod_private_ip within the VPC."
   type        = string
-  default     = "dlp.aig.internal"
+  default     = "dlpod.aig.internal"
 }

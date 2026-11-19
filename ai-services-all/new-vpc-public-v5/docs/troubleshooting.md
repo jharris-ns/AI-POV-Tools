@@ -155,10 +155,10 @@ openssl s_client -connect 10.0.2.20:443 -showcerts </dev/null 2>/dev/null \
 
 Expected output:
 ```
-subject=O=NetskopeLab, OU=Security, ..., CN=dlp.aig.internal
+subject=O=NetskopeLab, OU=Security, ..., CN=dlpod.aig.internal
 issuer=C=US, ST=CA, L=SantaClara, O=NetskopeLab, OU=Security, CN=Netskope Lab Root CA, emailAddress=admin@lab.internal
 X509v3 Subject Alternative Name:
-    DNS:dlp.aig.internal, IP Address:10.0.2.20
+    DNS:dlpod.aig.internal, IP Address:10.0.2.20
 ```
 
 The issuer should be the lab root CA (`ca_new_subj`, or the subject of your existing CA certificate). If it is not, DLPoD is serving its built-in cert — the bootstrap dlpaas section was not applied.
@@ -203,12 +203,12 @@ sudo cat /var/log/aig-bootstrap.log
 
 Error pattern:
 ```
-x509: certificate is valid for dlp.aig.internal, not
+x509: certificate is valid for dlpod.aig.internal, not
 ```
 
 **Cause:** The `dlp.host` in the bootstrap secret is a bare IP (`https://10.0.2.20`). The AIG's Go TLS stack cannot extract a hostname from an IP URL, so it validates against an empty string.
 
-**Fix:** `dlp.host` must use the hostname (`https://dlp.aig.internal`) with Route 53 resolving it to the DLPoD private IP. This is the current configuration — if you see this error, the secret predates the Route 53 fix.
+**Fix:** `dlp.host` must use the hostname (`https://dlpod.aig.internal`) with Route 53 resolving it to the DLPoD private IP. This is the current configuration — if you see this error, the secret predates the Route 53 fix.
 
 ```bash
 # Verify current secret content
@@ -219,7 +219,7 @@ aws secretsmanager get-secret-value \
   --output text | python3 -m json.tool | grep '"host"'
 
 # Should show:
-#   "host": "https://dlp.aig.internal"   ← correct
+#   "host": "https://dlpod.aig.internal"   ← correct
 #   "host": "https://10.0.2.20"           ← wrong, rebuild needed
 ```
 

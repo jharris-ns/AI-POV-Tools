@@ -91,6 +91,6 @@ locals {
   librechat_name  = "${var.aws_object_unique_prefix}-librechat"
   secret_name     = coalesce(var.secret_name, "aig/${var.aws_object_unique_prefix}/bootstrap")
 
-  # Extract the parent zone from dlpod_hostname (e.g. "dlp.aig.internal" → "aig.internal")
+  # Extract the parent zone from dlpod_hostname (e.g. "dlpod.aig.internal" → "aig.internal")
   dlpod_dns_zone = join(".", slice(split(".", var.dlpod_hostname), 1, length(split(".", var.dlpod_hostname))))
 }
