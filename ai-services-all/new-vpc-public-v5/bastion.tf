@@ -356,6 +356,15 @@ resource "aws_instance" "bastion" {
     DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y jq
 
+    # DLPoD server certificate (public, no key): the same PEM the AIG receives as
+    # dlp.certificate in its bootstrap secret. aig-cert-setup.sh uploads it as the
+    # AIG's DLP trust certificate if the bootstrap did not configure one.
+    cat > /home/ssm-user/${var.dlpod_hostname}-cert.pem <<'DLPCERT'
+    ${trimspace(tls_locally_signed_cert.dlpod.cert_pem)}
+    DLPCERT
+    chown ssm-user:ssm-user /home/ssm-user/${var.dlpod_hostname}-cert.pem
+    chmod 644 /home/ssm-user/${var.dlpod_hostname}-cert.pem
+
     # AIG setup and readiness reporter: runs continuously (see the locals above)
     cat > /etc/aig-cert-setup.conf <<'CONF'
     REGION=${var.aws_region}
@@ -364,6 +373,7 @@ resource "aws_instance" "bastion" {
     AIG_FQDN=${local.aig_fqdn}
     GUARDRAILS_HOST=${local.guardrails_host}
     DLPOD_HOST=https://${var.dlpod_hostname}
+    DLPOD_CERT=/home/ssm-user/${var.dlpod_hostname}-cert.pem
     READY_PARAM=${local.aig_ready_parameter}
     SSH_KEY=/home/ssm-user/.ssh/${local.keypair_name}.pem
     CA_KEY=/home/ssm-user/${local.ca_file_stem}-key.pem

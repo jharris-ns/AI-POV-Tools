@@ -60,6 +60,14 @@ resource "tls_locally_signed_cert" "dlpod" {
   ]
 }
 
+# Write the DLPoD server certificate (public, no key) next to the module so it
+# can be inspected or imported elsewhere.
+resource "local_file" "dlpod_cert" {
+  filename        = "${path.module}/${var.dlpod_hostname}-cert.pem"
+  content         = tls_locally_signed_cert.dlpod.cert_pem
+  file_permission = "0644"
+}
+
 # ── DLPoD bootstrap config ────────────────────────────────────────────────────
 #
 # bootstrap.json is delivered as raw JSON in EC2 user-data.

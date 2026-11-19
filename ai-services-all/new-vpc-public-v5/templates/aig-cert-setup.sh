@@ -22,7 +22,8 @@
 #                install it; then GET /v1/config/certificate/status is "Active"
 #   dlp          GET /v1/config/dlp has certificate_configured and
 #                host_config.host_url == DLPOD_HOST; if not, PUT dlp/ca-cert
-#                (the lab root CA) and PUT dlp/hostconfig, then GET again
+#                (the DLPoD server certificate, DLPOD_CERT) and PUT dlp/hostconfig,
+#                then GET again
 #   guardrails   GET /v1/config/ai-guardrails host_config.host_url ==
 #                GUARDRAILS_HOST; if not, PUT ai-guardrails/hostconfig, then
 #                GET again
@@ -348,11 +349,12 @@ read_dlp() {
 
 check_dlp() {
   [ -n "$DLPOD_HOST" ] || { err "DLPOD_HOST is not set in $CONF"; return 1; }
+  [ -s "$DLPOD_CERT" ] || { err "DLPOD_CERT '$DLPOD_CERT' is not set in $CONF or is missing"; return 1; }
   local body
   read_dlp || return 1
   if [ "$DLP_CERT" != true ]; then
-    log "DLP trust certificate is not configured; uploading the lab root CA"
-    body=$(jq -cn --rawfile cert "$CA_CERT" '{certificate: $cert}') \
+    log "DLP trust certificate is not configured; uploading the DLPoD server certificate ($DLPOD_CERT)"
+    body=$(jq -cn --rawfile cert "$DLPOD_CERT" '{certificate: $cert}') \
       || { err "could not build the DLP ca-cert request body"; return 1; }
     put_config "$DLP_PATH/ca-cert" "$body" "the DLP trust certificate" || return 1
   fi

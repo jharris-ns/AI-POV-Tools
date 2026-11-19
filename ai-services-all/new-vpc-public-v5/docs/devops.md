@@ -87,7 +87,7 @@ lab root CA (CA:TRUE; openssl-generated or supplied via ca_existing_signing_key_
 
 #### Certificate generation (Terraform apply — before any EC2 is created)
 
-The DLPoD server certificate is signed within Terraform by the lab root CA from `ca.tf` (generated locally with `openssl` unless `ca_existing_signing_key_local_path` is set). The CA certificate is the trust anchor the AIG uses to verify DLPoD.
+The DLPoD server certificate is signed within Terraform by the lab root CA from `ca.tf` (generated locally with `openssl` unless `ca_existing_signing_key_local_path` is set). The AIG is given the DLPoD leaf certificate itself (`tls_locally_signed_cert.dlpod.cert_pem`) as `dlp.certificate`, and the same PEM is written to `<dlpod_hostname>-cert.pem` in this directory (`local_file.dlpod_cert`, default `dlp.aig.internal-cert.pem`, gitignored via `*.pem`).
 
 1. **`tls_private_key.dlpod`** — generates the RSA private key for the DLPoD server (`dlpod_cert_rsa_bits`, default 2048)
 2. **`tls_cert_request.dlpod`** — creates a CSR with:
@@ -96,13 +96,16 @@ The DLPoD server certificate is signed within Terraform by the lab root CA from 
    - `DNS SAN = dlp.aig.internal` (var.dlpod_hostname)
    - `IP SAN = 10.0.2.20` (var.dlpod_private_ip)
 3. **`tls_locally_signed_cert.dlpod`** — the lab root CA signs the CSR to produce the leaf server cert (`CA:FALSE`, `server_auth`) valid for `dlpod_cert_validity_period_days` (default 90)
+4. **`local_file.dlpod_cert`** — writes the leaf cert (public, no key) to `<dlpod_hostname>-cert.pem` in this directory, for inspection or import elsewhere
 
-The CA cert PEM is then split across two consumers:
+The leaf cert PEM has two consumers:
 - → `aws_secretsmanager_secret_version.aig_bootstrap` as `dlp.certificate` (AIG uses this to verify DLPoD's TLS)
+- → `local.dlpod_bootstrap.dlpaas.server-cert` (the cert DLPoD presents)
+
+The CA cert PEM goes to DLPoD only:
 - → `local.dlpod_bootstrap.dlpaas.server-intermediate-ca-chain` (DLPoD sends this in the TLS handshake)
 
-The leaf cert and private key go only to DLPoD:
-- → `local.dlpod_bootstrap.dlpaas.server-cert` (leaf cert, `CA:FALSE`)
+The private key goes only to DLPoD:
 - → `local.dlpod_bootstrap.dlpaas.server-key` (PKCS#8 private key)
 
 #### AIG provisioning sequence
@@ -117,12 +120,12 @@ The leaf cert and private key go only to DLPoD:
      "enrollment_token": "<single-use token>",
      "ai_guardrails": { "host": "http://10.0.2.10:8080/invocations" },
      "dlp": {
-       "certificate": "-----BEGIN CERTIFICATE-----\n<CA cert PEM>\n-----END CERTIFICATE-----\n",
+       "certificate": "-----BEGIN CERTIFICATE-----\n<DLPoD leaf cert PEM>\n-----END CERTIFICATE-----\n",
        "host": "https://dlp.aig.internal"
      }
    }
    ```
-   Note: `dlp.certificate` is the **CA cert**, not the leaf cert. The AIG uses it as a trust anchor to verify the cert chain DLPoD presents. `dlp.host` uses the hostname (not bare IP) — see the AIG Validation section below.
+   Note: `dlp.certificate` is the DLPoD **leaf cert** (`tls_locally_signed_cert.dlpod.cert_pem`), not the CA cert. The AIG uses it to verify the cert DLPoD presents. `dlp.host` uses the hostname (not bare IP) — see the AIG Validation section below.
 
 #### AIG first boot
 
@@ -202,8 +205,8 @@ When the AIG enrolls and processes its bootstrap secret, it validates the DLPoD 
 2. **Resolve** `dlp.aig.internal` via VPC DNS → Route 53 private zone → `10.0.2.20`
 3. **Connect** to `10.0.2.20:443` via TCP
 4. **TLS handshake:** AIG presents no client cert; DLPoD presents its server cert chain
-5. **Certificate verification:** AIG uses `dlp.certificate` (the CA cert PEM) as the trust anchor
-   - Verifies the server cert is signed by the CA
+5. **Certificate verification:** AIG uses `dlp.certificate` (the DLPoD leaf cert PEM) to verify the server cert
+   - Verifies the server cert matches the configured `dlp.certificate`
    - Verifies the cert's DNS SAN includes `dlp.aig.internal` (the hostname from the URL)
    - Verifies validity period
 6. **Probe request:** AIG sends a POST to `https://dlp.aig.internal/inspections/jobs`

@@ -845,7 +845,7 @@ variable "dlpod_persona" {
 }
 
 variable "dlpod_hostname" {
-  description = "Hostname used as the DNS SAN (and, unless dlpod_cert_common_name is set, the CN) of the DLPoD server cert. Does not need to resolve in DNS — the AIG connects by IP (dlpod_private_ip)."
+  description = "Hostname used as the DNS SAN (and, unless dlpod_cert_common_name is set, the CN) of the DLPoD server cert. The AIG connects to DLPoD by this hostname (https://<dlpod_hostname>) and verifies the TLS SAN against it; a Route 53 private zone resolves it to dlpod_private_ip within the VPC."
   type        = string
   default     = "dlp.aig.internal"
 }
