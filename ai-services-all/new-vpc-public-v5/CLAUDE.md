@@ -135,6 +135,7 @@ Files Terraform writes to this directory, all gitignored and sensitive. Never pr
 |------|----------|
 | `my-private-key.pem` | Generated SSH private key (unless `keypair_existing_private_key_local_path` is set) |
 | `<prefix>-root-ca-key.pem`, `<prefix>-root-ca-cert.pem` | Lab root CA (unless `ca_existing_signing_*` are set). The cert is public; the key is not |
+| `<dlpod_hostname>-cert.pem` | DLPoD server certificate (public, no key), for example `dlp.aig.internal-cert.pem` |
 | `terraform.tfstate*` | Contains TLS private keys, the enrollment token and the license key |
 
 ---
